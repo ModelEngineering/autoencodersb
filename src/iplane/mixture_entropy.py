@@ -8,99 +8,113 @@ from typing import List, Optional # type: ignore
 import collections
 from scipy.stats import norm # type: ignore
 
+NULL_ARR = np.array([])  # type: ignore
+
 
 class MixtureEntropy(object):
     """Calculate entropy for a mixture of distributions."""
 
-    def __init__(self, n_components:int = 2, random_state:int = 42,
-            means:Optional[np.ndarray] = None,
-            covariances:Optional[np.ndarray] = None,
-            weights:Optional[np.ndarray] = None,
-            num_sample:Optional[float]=None):
+    def __init__(self,
+            n_components:int = 2,
+            random_state:int = 42,
+            num_dim:int = 1,
+            means:np.ndarray=NULL_ARR,
+            covariances:np.ndarray=NULL_ARR,
+            ):
+        """
+        Initializes the MixtureEntropy object.
+        Args:
+            n_components (int): number of components in the mixture model.
+            random_state (int): random state for reproducibility.
+            num_dim (int): number of dimensions of the data.
+            means (np.ndarray, optional): means of the Gaussian components.
+            covariances (np.ndarray, optional): covariances of the Gaussian components.
+            weights (np.ndarray, optional): weights of the Gaussian components.
+        """
         self.n_components = n_components
         self.random_state = random_state
+        self.num_dim = num_dim
         # Use k-means clustering to initialize the Gaussian Mixture Model
         self.gmm = GaussianMixture(n_components=n_components, random_state=random_state)
         if means is not None:
-            if (covariances is None) or (weights is None):
-                raise ValueError("Means, covariances, and weights must be provided together.")
-            std = np.std([means.ndim, covariances.ndim, weights.ndim])
-            if std > 0:
-                raise ValueError("Means, covariances, and weights must be 1D arrays.")
+            if means.ndim != 1 or covariances.ndim != 2:
+                import pdb; pdb.set_trace()
+                raise ValueError("Means must be 1D arrays; Covariances must be 2D arrays.")
         # Calculated
-        self._num_sample = num_sample
-        self._mean_arr:np.ndarray = means  # type: ignore
-        self._covariance_arr:np.ndarray = covariances # type: ignore
-        self._weight_arr:np.ndarray = weights # type: ignore
+        self._mean_arr = means
+        self._covariance_arr = covariances
+        self._weight_arr = np.array([])
         self.Hx = np.nan
         self.pdf_arr = np.array([])
         self.variante_arr = np.array([])
         self.dx = np.nan
 
-    @property
-    def num_samples(self)-> float:
-        """Returns the means of the Gaussian Mixture Model."""
-        if self._num_sample is None:
-                raise ValueError("GMM has not been fitted yet. Call fit() first.")
-        return self._num_sample
-    
+    ############## PROPERTIES ##############
     @property
     def mean_arr(self)-> np.ndarray:
         """Returns the means of the Gaussian Mixture Model."""
         if self._mean_arr is None:
-            if not hasattr(self.gmm, 'means_'):
+            if hasattr(self.gmm, 'means_'):
                 self._mean_arr = self.gmm.means_.flatten() # type: ignore
             else:
-                raise ValueError("GMM has not been fitted yet. Call fit() first.")
+                if self._covariance_arr is None:
+                    raise ValueError("GMM has not been fitted yet. Call fit() first.")
         return self._mean_arr
     
     @property
     def covariance_arr(self)-> np.ndarray:
         """Returns the means of the Gaussian Mixture Model."""
-        if not hasattr(self.gmm, 'covariances_'):
+        if hasattr(self.gmm, 'covariances_'):
             self._covariance_arr = self.gmm.covariances_.flatten() # type: ignore
         else:
-            raise ValueError("GMM has not been fitted yet. Call fit() first.")
+            if self._covariance_arr is None:
+                raise ValueError("GMM has not been fitted yet. Call fit() first.")
         return self._covariance_arr
+    
+    @property
+    def std_arr(self)-> np.ndarray:
+        """Returns the standard deviations of the Gaussian Mixture Model."""
+        return np.diagonal(self.covariance_arr**0.5)
     
     @property
     def weight_arr(self)-> np.ndarray:
         """Returns the means of the Gaussian Mixture Model."""
-        if not hasattr(self.gmm, 'covariances_'):
+        if hasattr(self.gmm, 'covariances_'):
             self._weight_arr = self.gmm.weights_.flatten() # type: ignore
         else:
-            raise ValueError("GMM has not been fitted yet. Call fit() first.")
+            if self._covariance_arr is None:
+                raise ValueError("GMM has not been fitted yet. Call fit() first.")
         return self._weight_arr
-
-    @classmethod
-    def generateMixture(cls, num_samples:List[int], means:List[float], 
-            stds:List[float], num_dim=2, noise:float=0.8)->np.ndarray:
+    
+    ############## METHODS ##############
+    def generateMixture(self, num_samples:List[int], noise:float=0.8)->np.ndarray:
         """
         Generates synthetic data for a multidimensional Gaussian Mixture Model.
+        Uses current values of means, stds, weights, and num_samples.
+        Additional dimensions are the first dimension plus a noise term.
 
         Args:
-            num_sample (int): number of samples in the n-th mixture
-            means (float): mean of the n-th mixture
-            std (float): standard deviation of the n-th mixture
-            num_dim (int): number of dimensions of the data
-            noise (float): noise level to add to the data
+            noise (float): standard deviation of the noise added to the data in each dimension.
+                Default is 0.8.
+
         Returns:
             np.array (num_sample, 1), int. total count is = sum(num_samples)
         """
-        results = [np.random.normal(m, s, n) for n, m, s in zip(num_samples, means, stds)]
+        # Calculate samples based on the Guassian mixure parameters.
+        results = [np.random.normal(m, s, n) for m, s, n in zip(self.mean_arr, self.std_arr, num_samples)]
         merged_arr = np.concatenate(results)
         data_arr = np.random.permutation(merged_arr).reshape(-1, 1)
-        # Add the other dimensions
+        # Include the other dimensions
         arrs = [data_arr]
-        num_total = sum(num_samples)
-        for _ in range(num_dim - 1):
+        num_total = np.sum(num_samples)
+        for _ in range(self.num_dim - 1):
             noise_arr = np.random.normal(0, noise, num_total)
             arrs.append(arrs[0] + noise_arr)
-        if num_dim > 1:
+        if self.num_dim > 1:
             arr = np.array(arrs)
-            arr = np.reshape(arr, num_sample, num_dim)
         else:
-            arr = data_arr
+            # Ensure the array is 2D
+            arr = data_arr.reshape(-1, 1)
         import pdb; pdb.set_trace()
         return arr
     
@@ -151,65 +165,20 @@ class MixtureEntropy(object):
                 dx (float): change in x values in calculation
         """
         self.gmm.fit(sample_arr)
-        self._num_sample = len(sample_arr)
         self.calculateEntropy()
 
-class TestMixtureEntropy(unittest.TestCase):
-    """Test class for MixtureEntropy."""
+    @staticmethod
+    def makeConvariance(stds:List[float])->np.ndarray:
+        """
+        Creates a covariance matrix for the Gaussian Mixture Model.
 
-    def setUp(self):
-        """Set up the test case."""
-        num_sample = np.array([100, 200])
-        means = np.array([0, 10])
-        stds = np.array([1, 2])
-        self.mixture_entropy = MixtureEntropy(
-            n_components=2,
-            means=means,
-            covariances=stds**2,
-            weights=self.weights
-        )
+        Args:
+            stds (List[float]): standard deviations of the Gaussian components.
 
-    def testGenerateMixture(self):
-        """Test the generateMixture method."""
-        arr = MixtureEntropy.generateMixture(num_sample, means, stds)
-        self.assertEqual(arr.shape[0], sum(num_sample))
-        self.assertEqual(arr.shape[1], 1)
-        self.assertTrue(np.all(arr >= -10))
-        self.assertTrue(np.all(arr <= 20))
-num_point = 1000
-sigmas = [1, 2, 4]
-num_component = len(sigmas)
-sample_arr = generateMixture([10*num_point]*num_component, 10*np.array(range(num_component)), sigmas)
-result = calculateMixture1d(sample_arr)
-assert(isinstance(result.gmm, GaussianMixture))
-print("OK!")
-
-
-# Tests
-if __name__ == "__main__":
-    precision = 2
-    num_sample1 = 3
-    small_mean = 0.1
-    arr = MixtureEntropy.generateMixture([num_sample1, 5],
-            [small_mean, 100], [.01, 10], num_dim=1)
-    assert(np.ndim(arr) == 2)
-    assert(np.sum(arr < 10*small_mean)) == num_sample1
-    print("OK!")
-    # Mxiture entropy
-    #   Guassian
-    for std in [1, 2, 4, 8]:
-        actual = 0.5*np.log2(2*np.pi*np.e*std**2)
-        estimated = calculateGaussianMixtureEntropy([0], [std], [1]).Hx
-        #print(actual, estimated)
-        assert(np.abs(actual - estimated) < 0.01)
-    #   Change in mean
-    estimate1 = calculateGaussianMixtureEntropy([0, 1], [4, 4], [0.5, 0.5]).Hx
-    estimate2 = calculateGaussianMixtureEntropy([0, 4], [4, 4], [0.5, 0.5]).Hx
-    #print(estimate1, estimate2)
-    assert(estimate1 < estimate2)
-    #   Change in std
-    estimate1 = calculateGaussianMixtureEntropy([0, 1], [4, 4], [0.5, 0.5]).Hx
-    estimate2 = calculateGaussianMixtureEntropy([0, 1], [4, 16], [0.5, 0.5]).Hx
-    #print(estimate1, estimate2)
-    assert(estimate1 < estimate2)
-    print("OK!")
+        Returns:
+            np.ndarray: covariance matrix.
+        """
+        if len(stds) == 1:
+            return np.array([[stds[0]**2]])
+        else:
+            return np.diag(np.array(stds)**2)
