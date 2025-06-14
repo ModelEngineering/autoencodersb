@@ -87,15 +87,14 @@ class MixtureEntropy(object):
         return self._weight_arr
     
     ############## METHODS ##############
-    def generateMixture(self, num_samples:List[int], noise:float=0.8)->np.ndarray:
+    def generateMixture(self, num_samples:List[int], shift:float=0.8)->np.ndarray:
         """
         Generates synthetic data for a multidimensional Gaussian Mixture Model.
         Uses current values of means, stds, weights, and num_samples.
         Additional dimensions are the first dimension plus a noise term.
 
         Args:
-            noise (float): standard deviation of the noise added to the data in each dimension.
-                Default is 0.8.
+            shifht: amount by which the mean is shifted for each successive dimension.
 
         Returns:
             np.array (num_sample, 1), int. total count is = sum(num_samples)
@@ -103,19 +102,18 @@ class MixtureEntropy(object):
         # Calculate samples based on the Guassian mixure parameters.
         results = [np.random.normal(m, s, n) for m, s, n in zip(self.mean_arr, self.std_arr, num_samples)]
         merged_arr = np.concatenate(results)
-        data_arr = np.random.permutation(merged_arr).reshape(-1, 1)
+        data_arr = np.random.permutation(merged_arr)
         # Include the other dimensions
         arrs = [data_arr]
         num_total = np.sum(num_samples)
-        for _ in range(self.num_dim - 1):
-            noise_arr = np.random.normal(0, noise, num_total)
-            arrs.append(arrs[0] + noise_arr)
+        for idx in range(1, self.num_dim):
+            arrs.append(arrs[0] + idx*shift)
         if self.num_dim > 1:
             arr = np.array(arrs)
+            arr = arr.T  # Transpose to get the correct shape
         else:
             # Ensure the array is 2D
             arr = data_arr.reshape(-1, 1)
-        import pdb; pdb.set_trace()
         return arr
     
     def calculateEntropy(self)->None:
