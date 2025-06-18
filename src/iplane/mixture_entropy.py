@@ -1,15 +1,22 @@
 '''Calculate entropy for a mixture of distributions. Currently, it supports Gaussian Mixtures.'''
 
+import collections
+import itertools
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.stats import multivariate_normal # type: ignore
 from sklearn.model_selection import train_test_split # type: ignore
 from sklearn.mixture import GaussianMixture  # type: ignore
-from typing import List, Optional # type: ignore
-import collections
 from scipy.stats import norm # type: ignore
+from typing import List, Optional, Union # type: ignore
 
 NULL_ARR = np.array([])  # type: ignore
 
+# Define a named tuple for the density
+#   variate_arr: values for the variate has the same number of dimensions as the distribution
+#   pdf_arr: dimensioned as the variate_arr
+#   dx_arr: change in x values in each dimension
+Density = collections.namedtuple('Density', ['variate_arr', 'pdf_arr', 'dx_arr', 'Hx'])  # type: ignore
 
 class MixtureEntropy(object):
     """Calculate entropy for a mixture of distributions."""
@@ -17,33 +24,18 @@ class MixtureEntropy(object):
     def __init__(self,
             n_components:int = 2,
             random_state:int = 42,
-            num_dim:int = 1,
-            means:np.ndarray=NULL_ARR,
-            covariances:np.ndarray=NULL_ARR,
             ):
         """
         Initializes the MixtureEntropy object.
         Args:
             n_components (int): number of components in the mixture model.
             random_state (int): random state for reproducibility.
-            num_dim (int): number of dimensions of the data.
-            means (np.ndarray, optional): means of the Gaussian components.
-            covariances (np.ndarray, optional): covariances of the Gaussian components.
-            weights (np.ndarray, optional): weights of the Gaussian components.
         """
         self.n_components = n_components
         self.random_state = random_state
-        self.num_dim = num_dim
         # Use k-means clustering to initialize the Gaussian Mixture Model
         self.gmm = GaussianMixture(n_components=n_components, random_state=random_state)
-        if means is not None:
-            if means.ndim != 1 or covariances.ndim != 2:
-                import pdb; pdb.set_trace()
-                raise ValueError("Means must be 1D arrays; Covariances must be 2D arrays.")
         # Calculated
-        self._mean_arr = means
-        self._covariance_arr = covariances
-        self._weight_arr = np.array([])
         self.Hx = np.nan
         self.pdf_arr = np.array([])
         self.variante_arr = np.array([])
@@ -52,24 +44,18 @@ class MixtureEntropy(object):
     ############## PROPERTIES ##############
     @property
     def mean_arr(self)-> np.ndarray:
-        """Returns the means of the Gaussian Mixture Model."""
-        if self._mean_arr is None:
-            if hasattr(self.gmm, 'means_'):
-                self._mean_arr = self.gmm.means_.flatten() # type: ignore
-            else:
-                if self._covariance_arr is None:
-                    raise ValueError("GMM has not been fitted yet. Call fit() first.")
-        return self._mean_arr
+        if hasattr(self.gmm, 'means_'):
+            return self.gmm.means_ # type: ignore
+        else:
+            raise ValueError("GMM has not been fitted yet. Call fit() first.")
     
     @property
     def covariance_arr(self)-> np.ndarray:
         """Returns the means of the Gaussian Mixture Model."""
-        if hasattr(self.gmm, 'covariances_'):
-            self._covariance_arr = self.gmm.covariances_.flatten() # type: ignore
+        if hasattr(self.gmm, 'means_'):
+            return self.gmm.covariances_ # type: ignore
         else:
-            if self._covariance_arr is None:
-                raise ValueError("GMM has not been fitted yet. Call fit() first.")
-        return self._covariance_arr
+            raise ValueError("GMM has not been fitted yet. Call fit() first.")
     
     @property
     def std_arr(self)-> np.ndarray:
@@ -77,77 +63,166 @@ class MixtureEntropy(object):
         return np.diagonal(self.covariance_arr**0.5)
     
     @property
+    def num_dim(self)-> int:
+        """Returns the number of dimensions in the Gaussian Mixture Model."""
+        if hasattr(self.gmm, 'means_'):
+            return self.mean_arr.shape[1]
+        else:
+            raise ValueError("GMM has not been fitted yet. Call fit() first.")
+    
+    @property
     def weight_arr(self)-> np.ndarray:
         """Returns the means of the Gaussian Mixture Model."""
-        if hasattr(self.gmm, 'covariances_'):
-            self._weight_arr = self.gmm.weights_.flatten() # type: ignore
+        if hasattr(self.gmm, 'means_'):
+            return self.gmm.weights_.flatten() # type: ignore
         else:
-            if self._covariance_arr is None:
-                raise ValueError("GMM has not been fitted yet. Call fit() first.")
-        return self._weight_arr
+            raise ValueError("GMM has not been fitted yet. Call fit() first.")
     
     ############## METHODS ##############
-    def generateMixture(self, num_samples:List[int], shift:float=0.8)->np.ndarray:
+    @classmethod
+    def generateMixture(cls,
+            sample_arr:np.ndarray,
+            mean_arr:np.ndarray,
+            covariance_arr:np.ndarray,
+            )-> np.ndarray:
         """
         Generates synthetic data for a multidimensional Gaussian Mixture Model.
-        Uses current values of means, stds, weights, and num_samples.
-        Additional dimensions are the first dimension plus a noise term.
+            Each Gaussian component is defined by its mean and covariance marix.
+            Components are indexed by the first array index
+            Dimensions are indexed by the second array index for mean.
+            For covariance, there is a third index for the covariance matrix.
 
         Args:
-            shifht: amount by which the mean is shifted for each successive dimension.
+            sample_arr (np.ndarray): Number of samples to generate for each component.
+            mean_arr (np.ndarray): Mean of each Gaussian component.
+            covariance_arr (np.ndarray): Covariance matrix for each Gaussian component.
 
         Returns:
             np.array (num_sample, 1), int. total count is = sum(num_samples)
         """
+        if np.std([np.shape(covariance_arr)[0], len(sample_arr), len(mean_arr)]) != 0:
+            raise ValueError("Covariance, sample, and mean arrays must have the same number of components.")
+        num_component = len(sample_arr)
         # Calculate samples based on the Guassian mixure parameters.
-        results = [np.random.normal(m, s, n) for m, s, n in zip(self.mean_arr, self.std_arr, num_samples)]
-        merged_arr = np.concatenate(results)
-        data_arr = np.random.permutation(merged_arr)
-        # Include the other dimensions
-        arrs = [data_arr]
-        num_total = np.sum(num_samples)
-        for idx in range(1, self.num_dim):
-            arrs.append(arrs[0] + idx*shift)
-        if self.num_dim > 1:
-            arr = np.array(arrs)
-            arr = arr.T  # Transpose to get the correct shape
+        arrs = []
+        if (mean_arr.ndim == 1) or (np.shape(mean_arr)[1] == 1):
+            std_arr = np.sqrt(covariance_arr)
+            for m, s, n in zip(mean_arr, std_arr, sample_arr):
+                result_arr = np.random.normal(loc=m, scale=s, size=n)
+                arrs.append(result_arr)
         else:
-            # Ensure the array is 2D
-            arr = data_arr.reshape(-1, 1)
-        return arr
-    
-    def calculateEntropy(self)->None:
+            for idx in range(num_component):
+                result_arr = np.random.multivariate_normal(mean_arr[idx, :], covariance_arr[idx, :, :],  sample_arr[idx])
+                arrs.append(result_arr)
+        merged_arr = np.concatenate(arrs)
+        merged_arr = np.random.permutation(merged_arr)
+        return merged_arr
+
+    @staticmethod
+    def makeDensity(
+            num_sample:int,
+            mean_arr:np.ndarray,
+            covariance_arr:np.ndarray,
+            weight_arr:np.ndarray,
+            )-> Density:
         """
-        Uses the normal distribut to calculate the expected entropy of a guassian mixture.
+        Calculates the probability density function (PDF) for a multi-dimensional Gaussian mixture model
+        and calculates its differential entropy.
 
         Args:
-            means: distribution of the means
-            stds: variances of the distributions
-            weights: weight of component
+            num_sample (int): Number of samples to generate for each dimension
+            mean_arr (np.ndarray): N X D Mean of each Gaussian component (N) for each dimension (D).
+            covariance_arr (np.ndarray): N X D X D Covariance matrix for each Gaussian component (N) for the dimensions (D).
+                            (If only one dimension for each component, then N X 1)
+            weight_arr (Optional[np.ndarray]): N Weights for each Gaussian component (N).
 
-        Calculates
-            self.Hx
-            self.pdf_arr
-            self.dx
-
+        Returns:
+            Density
         """
-        NUM_POINT =1000
-        EXTREME_SIGMA = 4
+        # Checks
+        if not np.isclose(sum(weight_arr), 1):
+            raise ValueError("Weights must sum to 1.")
+        if mean_arr.ndim != 2:
+            raise ValueError("Mean array must be 2-dimensional.")
+        if covariance_arr.ndim < 2:
+            raise ValueError("Covariance array must be at least 2-dimensional.")
         #
-        # Calculate the range for the x-variate
-        std_arr = (self.covariance_arr**0.5).diagonal()
-        lower_bound = min([m - EXTREME_SIGMA*s for m, s in zip(self.mean_arr, std_arr)])
-        upper_bound = max([m + EXTREME_SIGMA*s for m, s in zip(self.mean_arr, std_arr)])
-        variate_arr = np.linspace(lower_bound, upper_bound, NUM_POINT)
-        self.dx = np.mean(np.diff(variate_arr))
-        # Calculate the PDFs
-        self.pdf_arr = np.zeros(NUM_POINT)
-        for mean, std, weight in zip(self.mean_arr, std_arr, self.weight_arr):
-            self.pdf_arr += weight*norm.pdf(variate_arr, loc=mean, scale=std)
-        # Entropy
-        self.Hx = -sum(self.pdf_arr*np.log2(self.pdf_arr))*self.dx
+        dims = [mean_arr.shape[1], covariance_arr.shape[1]]
+        if mean_arr.ndim == 1:
+            mean_arr = np.reshape(mean_arr, (dims[0], -1))  # Ensure mean_arr is 2D
+        if not all([d == dims[0] for d in dims]):
+            raise ValueError("Mean and covariance arrays must have the same number of components.")
+        #
+        num_dim = dims[0]
+        n_component = mean_arr.shape[0]
+        STD_MAX = 4
+        # Caclulate the coordinates for each dimension
+        linspaces:list = []
+        dxs = []
+        for dim_idx in range(num_dim):
+            if num_dim == 1:
+                std_arr = np.sqrt(covariance_arr)
+            else:
+                std_arr = np.sqrt(covariance_arr[:, dim_idx, dim_idx])
+            std_arr = std_arr.flatten()
+            min_val = min(mean_arr[:, dim_idx] - STD_MAX * std_arr)
+            max_val = max(mean_arr[:, dim_idx] + STD_MAX * std_arr)
+            linspaces.append(np.linspace(min_val, max_val, num_sample))
+            dx = np.mean(np.diff(linspaces[dim_idx]))
+            dxs.append(dx)
+        variate_arrs = np.meshgrid(*linspaces, indexing='ij')  # Create a grid of variates
+        variate_arr = np.array(variate_arrs, dtype=float).T.reshape(-1, num_dim)  # Reshape to a 2D array
+        dx_arr = np.array(dxs)
+        # Calculate the densities at each variate value
+        pdfs:list = []
+        pdf = 0
+        for i_component in range(n_component):
+            means = mean_arr[i_component, :]
+            if num_dim == 1:
+                covariance = covariance_arr[i_component]
+            else:
+                covariance = covariance_arr[i_component, :, :]
+            weight = weight_arr[i_component]
+            mvn = multivariate_normal(mean=means, cov=covariance)   # type: ignore
+            pdfs.append(weight*mvn.pdf(variate_arr))
+        pdf_arr = np.sum(pdfs, axis=0)  # Sum the PDFs of all components
+        # Calculate entropy
+        Hx = -np.sum(pdf_arr * np.log2(pdf_arr + 1e-10)) * np.prod(dxs)  # Add small value to avoid log(0)
+        return Density(variate_arr=variate_arr, pdf_arr=pdf_arr, dx_arr=dx_arr, Hx=Hx)
     
-    def calculateMixture1d(self, sample_arr)->None:
+    @staticmethod
+    def calculateUnivariateGaussianEntropy(variance:Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+        """
+        Calculates the entropy of one or more univariate Gaussian distributions
+
+        Args:
+            variance (float or array of floats): Variance of the Gaussian distribution.
+
+        Returns:
+            float (array of floats if input is array of floats): Entropy of the Gaussian distribution.
+        """
+        if np.any(variance <= 0):
+            raise ValueError("Variance must be positive.")
+        return 0.5 * np.log2(2 * np.pi * np.e * variance)
+
+    @staticmethod
+    def calculateMultivariateGaussianEntropy(covariance:np.ndarray) -> float:
+        """
+        Calculates the entropy of a multivariate Gaussian distribution
+
+        Args:
+            covariance (np.ndarray): Covariance matrix of the Gaussian distribution.
+
+        Returns:
+            float: Entropy of the Gaussian distribution.
+        """
+        det = np.linalg.det(covariance)
+        num_dim = covariance.shape[0]
+        if np.isclose(det, 0):
+            raise ValueError("Covariance matrix must be non-singular.")
+        return 0.5 * np.log2(((2 * np.pi * np.e)**num_dim) * det)
+    
+    def fit(self, sample_arr)->None:
         """
         Calculates a guassian mixture distribution for 1d sample.
 
@@ -162,8 +237,9 @@ class MixtureEntropy(object):
                 pdf_arr: density
                 dx (float): change in x values in calculation
         """
+        if sample_arr.ndim == 1:
+            sample_arr = sample_arr.reshape(-1, 1)
         self.gmm.fit(sample_arr)
-        self.calculateEntropy()
 
     @staticmethod
     def makeConvariance(stds:List[float])->np.ndarray:
