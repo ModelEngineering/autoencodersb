@@ -185,10 +185,11 @@ class TestMixtureEntropy(unittest.TestCase):
     
     def testMakeDensity1Component2Dimension(self):
         # Evaluates calculations for 1-dimensional mixture and multiple components to the mixture.
-        if IGNORE_TESTS:
-            return
+        #if IGNORE_TESTS:
+        #    return
+        MAX_NUM_SAMPLE = int(1e7)
         def test(num_dimension:int=2):
-            num_sample = int(NUM_SAMPLE**(1/num_dimension))
+            num_sample = int(MAX_NUM_SAMPLE**(1/num_dimension))
             mean_arr = np.array([(20*n)*0.5 for n in range(num_dimension)], dtype=float)
             mean_arr = np.reshape(mean_arr, (1, num_dimension))
             # Independent dimensions
@@ -208,16 +209,16 @@ class TestMixtureEntropy(unittest.TestCase):
                 plt.xlabel("Value")
                 plt.ylabel("Density")
                 plt.show()
-            # Assume that all weights are equal
+            expected_Hx = MixtureEntropy.calculateMultivariateGaussianEntropy(covariance_arr[0])
+            self.assertAlmostEqual(expected_Hx, result.Hx, delta=0.1)
         ##
+        test(6)
         test(2)
-        test(8)
 
-    # FIXME: Estimate the entropy for these cases
     def testMakeDensity2Component2Dimension(self):
         # Evaluates calculations for 2-dimensional mixture and multiple components to the mixture.
-        #if IGNORE_TESTS:
-        #    return
+        if IGNORE_TESTS:
+            return
         def test(num_dimension:int=2, num_component:int=3):
             num_sample = int(NUM_SAMPLE**(1/num_dimension))
             mean_arr = np.array([(20*n)*0.5 for n in range(num_dimension)], dtype=float)
@@ -228,7 +229,6 @@ class TestMixtureEntropy(unittest.TestCase):
             np.fill_diagonal(covariance_arr, diagonal_arr)
             covariance_arr = np.array([covariance_arr]*num_component)
             weight_arr = np.repeat(1/num_component, num_component)
-            import pdb; pdb.set_trace()
             result = MixtureEntropy.makeDensity(
                     num_sample=num_sample,
                     mean_arr=mean_arr,

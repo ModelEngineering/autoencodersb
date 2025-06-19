@@ -170,8 +170,8 @@ class MixtureEntropy(object):
             linspaces.append(np.linspace(min_val, max_val, num_sample))
             dx = np.mean(np.diff(linspaces[dim_idx]))
             dxs.append(dx)
-        variate_arrs = np.meshgrid(*linspaces, indexing='ij')  # Create a grid of variates
-        variate_arr = np.array(variate_arrs, dtype=float).T.reshape(-1, num_dim)  # Reshape to a 2D array
+        #variate_arrs = np.meshgrid(*linspaces, indexing='xy')  # Create a grid of variates
+        variate_arr = np.array(list(itertools.product(*linspaces)))  # Create a grid of variates
         dx_arr = np.array(dxs)
         # Calculate the densities at each variate value
         pdfs:list = []
@@ -206,18 +206,18 @@ class MixtureEntropy(object):
         return 0.5 * np.log2(2 * np.pi * np.e * variance)
 
     @staticmethod
-    def calculateMultivariateGaussianEntropy(covariance:np.ndarray) -> float:
+    def calculateMultivariateGaussianEntropy(covariance_arr:np.ndarray) -> float:
         """
         Calculates the entropy of a multivariate Gaussian distribution
 
         Args:
-            covariance (np.ndarray): Covariance matrix of the Gaussian distribution.
+            covariance_arr (np.ndarray): Covariance matrix of the Gaussian distribution.
 
         Returns:
             float: Entropy of the Gaussian distribution.
         """
-        det = np.linalg.det(covariance)
-        num_dim = covariance.shape[0]
+        det = np.linalg.det(covariance_arr)
+        num_dim = covariance_arr.shape[0]
         if np.isclose(det, 0):
             raise ValueError("Covariance matrix must be non-singular.")
         return 0.5 * np.log2(((2 * np.pi * np.e)**num_dim) * det)
