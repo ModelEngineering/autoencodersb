@@ -16,7 +16,7 @@ NULL_ARR = np.array([])  # type: ignore
 #   variate_arr: values for the variate has the same number of dimensions as the distribution
 #   pdf_arr: dimensioned as the variate_arr
 #   dx_arr: change in x values in each dimension
-Density = collections.namedtuple('Density', ['variate_arr', 'pdf_arr', 'dx_arr', 'Hx'])  # type: ignore
+EntropyResult = collections.namedtuple('EntropyResult', ['variate_arr', 'pdf_arr', 'dx_arr', 'Hx'])  # type: ignore
 
 class MixtureEntropy(object):
     """Calculate entropy for a mixture of distributions."""
@@ -38,8 +38,8 @@ class MixtureEntropy(object):
         # Calculated
         self.Hx = np.nan
         self.pdf_arr = np.array([])
-        self.variante_arr = np.array([])
-        self.dx = np.nan
+        self.variate_arr = np.array([])
+        self.dx_arr = np.array([])
 
     ############## PROPERTIES ##############
     @property
@@ -117,14 +117,35 @@ class MixtureEntropy(object):
         merged_arr = np.concatenate(arrs)
         merged_arr = np.random.permutation(merged_arr)
         return merged_arr
+    
+    def calculateEntropy(self):
+        """Calculates the entropy of the Gaussian Mixture Model.
+        Updates self.Hx and distribution information
+
+        Raises:
+            ValueError: No fitted model
+        """
+        if not hasattr(self.gmm, 'means_'):
+            raise ValueError("GMM has not been fitted yet. Call fit() first.")
+        # Calculate the density
+        entropy_result = self.calculateMixtureEntropy(
+            mean_arr=self.gmm.means_,  # type: ignore
+            covariance_arr=self.gmm.covariances_,  # type: ignore
+            weight_arr=self.gmm.weights_,  # type: ignore
+        )
+        # Update the properties
+        self.variante_arr = entropy_result.variate_arr
+        self.pdf_arr = entropy_result.pdf_arr
+        self.dx_arr = entropy_result.dx_arr
+        self.Hx = entropy_result.Hx
 
     @staticmethod
-    def makeDensity(
-            num_sample:int,
+    def calculateMixtureEntropy(
             mean_arr:np.ndarray,
             covariance_arr:np.ndarray,
             weight_arr:np.ndarray,
-            )-> Density:
+            max_num_sample:int = int(1e7),
+            )-> EntropyResult:
         """
         Calculates the probability density function (PDF) for a multi-dimensional Gaussian mixture model
         and calculates its differential entropy.
@@ -135,6 +156,7 @@ class MixtureEntropy(object):
             covariance_arr (np.ndarray): N X D X D Covariance matrix for each Gaussian component (N) for the dimensions (D).
                             (If only one dimension for each component, then N X 1)
             weight_arr (Optional[np.ndarray]): N Weights for each Gaussian component (N).
+            max_num_sample (int): Maximum number of samples to generate for each dimension. 
 
         Returns:
             Density
@@ -155,6 +177,10 @@ class MixtureEntropy(object):
         #
         num_dim = dims[0]
         n_component = mean_arr.shape[0]
+        # Calculate the number of samples for each dimension
+        num_sample = int(max_num_sample**(1/num_dim))
+        if num_sample < 8:
+            raise ValueError("Number of samples per dimension must be at least 8. Increase max_num_sample.")
         STD_MAX = 4
         # Caclulate the coordinates for each dimension
         linspaces:list = []
@@ -188,7 +214,7 @@ class MixtureEntropy(object):
         pdf_arr = np.sum(pdfs, axis=0)  # Sum the PDFs of all components
         # Calculate entropy
         Hx = -np.sum(pdf_arr * np.log2(pdf_arr + 1e-10)) * np.prod(dxs)  # Add small value to avoid log(0)
-        return Density(variate_arr=variate_arr, pdf_arr=pdf_arr, dx_arr=dx_arr, Hx=Hx)
+        return EntropyResult(variate_arr=variate_arr, pdf_arr=pdf_arr, dx_arr=dx_arr, Hx=Hx)
     
     @staticmethod
     def calculateUnivariateGaussianEntropy(variance:Union[float, np.ndarray]) -> Union[float, np.ndarray]:

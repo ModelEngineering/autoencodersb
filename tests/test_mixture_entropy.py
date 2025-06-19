@@ -5,7 +5,7 @@ import numpy as np
 from typing import List, Any
 import unittest
 
-IGNORE_TESTS = True
+IGNORE_TESTS = False
 IS_PLOT = False
 NUM_SAMPLE = 1000
 
@@ -13,17 +13,13 @@ NUM_SAMPLE = 1000
 class TestMixtureEntropy(unittest.TestCase):
     """Test class for MixtureEntropy."""
 
-    def setUp(self):
-        """Set up the test case."""
-        pass
-
     def makeMixture(self,
             num_component:int=2,
             component_sample_size:int=NUM_SAMPLE,
             num_dim:int=1,
             variance:float=0.5,
-            covariance:float=0,  # Between non-identical dimensions
-    ):
+            covariance:float=0.0,  # Between non-identical dimensions
+    )-> np.ndarray:
         # Size of sample for the ith component is 100 less than i+1st
         sample_arr = np.array([n*component_sample_size for n in range(1, num_component+1)])
         means:List[Any] = []
@@ -134,8 +130,7 @@ class TestMixtureEntropy(unittest.TestCase):
             return
         MEAN_ARR = np.reshape(np.array([5]), (1, -1))
         COVARIANCE_ARR = np.reshape(np.array([0.5]), (1, -1))
-        result = MixtureEntropy.makeDensity(
-                num_sample=NUM_SAMPLE,
+        result = MixtureEntropy.calculateMixtureEntropy(
                 mean_arr=MEAN_ARR,
                 covariance_arr=COVARIANCE_ARR,
                 weight_arr=np.array([1]))
@@ -155,7 +150,6 @@ class TestMixtureEntropy(unittest.TestCase):
         # Evaluates calculations for 1-dimensional mixture and multiple components to the mixture.
         if IGNORE_TESTS:
             return
-        NUM_SAMPLE = 200
         def test(num_component:int=2):
             mean_arr = np.array([(20*n)*0.5 for n in range(num_component)])
             mean_arr = np.reshape(mean_arr, (-1, 1))
@@ -163,8 +157,7 @@ class TestMixtureEntropy(unittest.TestCase):
             covariance_arr = np.array([(n+1)*0.1 for n in range(num_component)])
             covariance_arr = np.reshape(covariance_arr, (-1, 1))
             weight_arr = np.repeat(1/num_component, num_component)
-            result = MixtureEntropy.makeDensity(
-                    num_sample=NUM_SAMPLE,
+            result = MixtureEntropy.calculateMixtureEntropy(
                     mean_arr=mean_arr,
                     covariance_arr=covariance_arr,
                     weight_arr=weight_arr)
@@ -185,11 +178,9 @@ class TestMixtureEntropy(unittest.TestCase):
     
     def testMakeDensity1Component2Dimension(self):
         # Evaluates calculations for 1-dimensional mixture and multiple components to the mixture.
-        #if IGNORE_TESTS:
-        #    return
-        MAX_NUM_SAMPLE = int(1e7)
+        if IGNORE_TESTS:
+            return
         def test(num_dimension:int=2):
-            num_sample = int(MAX_NUM_SAMPLE**(1/num_dimension))
             mean_arr = np.array([(20*n)*0.5 for n in range(num_dimension)], dtype=float)
             mean_arr = np.reshape(mean_arr, (1, num_dimension))
             # Independent dimensions
@@ -198,8 +189,7 @@ class TestMixtureEntropy(unittest.TestCase):
             np.fill_diagonal(covariance_arr, diagonal_arr)
             covariance_arr = np.reshape(covariance_arr, (1, num_dimension, num_dimension))
             weight_arr = np.array([1])
-            result = MixtureEntropy.makeDensity(
-                    num_sample=num_sample,
+            result = MixtureEntropy.calculateMixtureEntropy(
                     mean_arr=mean_arr,
                     covariance_arr=covariance_arr,
                     weight_arr=weight_arr)
@@ -220,7 +210,6 @@ class TestMixtureEntropy(unittest.TestCase):
         if IGNORE_TESTS:
             return
         def test(num_dimension:int=2, num_component:int=3):
-            num_sample = int(NUM_SAMPLE**(1/num_dimension))
             mean_arr = np.array([(20*n)*0.5 for n in range(num_dimension)], dtype=float)
             mean_arr = np.array([mean_arr + n*10 for n in range(num_component)])
             # Independent dimensions
@@ -229,8 +218,7 @@ class TestMixtureEntropy(unittest.TestCase):
             np.fill_diagonal(covariance_arr, diagonal_arr)
             covariance_arr = np.array([covariance_arr]*num_component)
             weight_arr = np.repeat(1/num_component, num_component)
-            result = MixtureEntropy.makeDensity(
-                    num_sample=num_sample,
+            result = MixtureEntropy.calculateMixtureEntropy(
                     mean_arr=mean_arr,
                     covariance_arr=covariance_arr,
                     weight_arr=weight_arr)
@@ -243,6 +231,22 @@ class TestMixtureEntropy(unittest.TestCase):
             # Assume that all weights are equal
         ##
         test()
+
+    def testCalculateEntropy1Component2Dimension(self):
+        # Test the calculation of entropy for a mixture distribution
+        # Test is done for a single component so that an exact calculation can be done.
+        if IGNORE_TESTS:
+            return
+        num_component = 1
+        sample_arr = self.makeMixture(num_dim=5, num_component=num_component, variance=1.5)
+        mixture_entropy = MixtureEntropy(
+            n_components=num_component,
+            random_state=42
+        )
+        mixture_entropy.fit(sample_arr)
+        mixture_entropy.calculateEntropy()
+        expected_Hx = MixtureEntropy.calculateMultivariateGaussianEntropy(mixture_entropy.covariance_arr[0])
+        self.assertAlmostEqual(expected_Hx, mixture_entropy.Hx, delta=0.01)
 
 
 if __name__ == '__main__':

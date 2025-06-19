@@ -1,4 +1,3 @@
-fastai
 jupyterlab
 matplotlib
 mypy
@@ -7,9 +6,5 @@ nose2
 pandas
 pip
 seaborn
-spacy
 tabulate
-tensorflow
-tf_keras
 torch
-torchvision
