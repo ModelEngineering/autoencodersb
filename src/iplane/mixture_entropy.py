@@ -1,4 +1,5 @@
 '''Calculate entropy for a mixture of distributions. Currently, it supports Gaussian Mixtures.'''
+import iplane.constants as cn  # type: ignore
 
 import collections
 import itertools
@@ -10,7 +11,6 @@ from sklearn.mixture import GaussianMixture  # type: ignore
 from scipy.stats import norm # type: ignore
 from typing import List, Optional, Union # type: ignore
 
-NULL_ARR = np.array([])  # type: ignore
 
 # Define a named tuple for the density
 #   variate_arr: values for the variate has the same number of dimensions as the distribution
