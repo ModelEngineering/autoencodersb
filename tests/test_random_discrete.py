@@ -10,13 +10,13 @@ NUM_SAMPLE = 1000
 CATEGORICAL_ARR = np.random.randint(0, 5, NUM_SAMPLE)  # Random categorical data with 5 categories
 
 
-class TestCategoricalEntropy(unittest.TestCase):
+class TestRandomDiscrete(unittest.TestCase):
 
     def setUp(self):
         """Set up the test case."""
         self.discrete = RandomDiscrete()
 
-    def testCalculate(self):
+    def testEstimatePCollection(self):
         ##
         def test(val:int):
             """Helper function to test entropy calculation."""

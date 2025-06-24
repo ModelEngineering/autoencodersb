@@ -1,8 +1,10 @@
-from iplane.random_mixture import RandomMixture, PCollectionMixture, DCollectionMixture  # type: ignore
+from iplane.random_mixture import RandomMixture  # type: ignore
+import iplane.constants as cn  # type: ignore
+from iplane.random_mixture_collection import PCollectionMixture, DCollectionMixture  # type: ignore
 
 from matplotlib import pyplot as plt  # type: ignore
 import numpy as np
-from typing import List, Any
+from typing import List, Any, Tuple
 import unittest
 
 IGNORE_TESTS = True
@@ -10,33 +12,6 @@ IS_PLOT = False
 NUM_SAMPLE = 1000
 
 
-#######################################
-class TestPCollectionMixture(unittest.TestCase):
-
-    def testParameterMGaussian(self):
-        """Test the ParameterMGaussian class."""
-        #if IGNORE_TESTS:
-        #    return
-        dct = {
-            'mean_arr': np.array([0, 1]),
-            'covariance_arr': np.array([[0.5, 0], [0, 0.5]]),
-            'weight_arr': np.array([0.5, 0.5]),
-            'num_component': 2,
-            'random_state': 42}
-        pcollection = PCollectionMixture(parameter_dct=dct)
-        #
-        self.assertTrue(pcollection == pcollection)
-
-
-#######################################
-class TestDCollectionMixture(unittest.TestCase):
-
-    def setUp(self):
-        pass
-
-
-
-#######################################
 class TestRandomMixture(unittest.TestCase):
 
     def setUp(self):
@@ -66,15 +41,9 @@ class TestRandomMixture(unittest.TestCase):
                 means.append(10 * n_component)
         mean_arr = np.array(means)
         covariance_arr = np.array(covariances)
-        dct = {
-            'mean_arr': mean_arr,
-            'covariance_arr': covariance_arr,
-            'weight_arr': np.repeat(1/num_component, num_component),
-            }
-        arr = self.random.generateSample(
-            sample_arr=sample_arr,
-            mean_arr=mean_arr,
-            covariance_arr=covariance_arr)
+        pcollection = PCollectionMixture(mean_arr= mean_arr, covariance_arr=covariance_arr,
+                weight_arr= np.repeat(1/num_component, num_component))
+        arr = self.random.generateSample(pcollection=pcollection, num_sample=NUM_SAMPLE)
         if IS_PLOT:
             if num_dim == 1:
                 plt.hist(arr, bins=30)
@@ -108,26 +77,24 @@ class TestRandomMixture(unittest.TestCase):
         self.assertEqual(sample_arr.shape[0], 6*NUM_SAMPLE)
         self.assertEqual(sample_arr.shape[1], num_dim)
     
-    def testFit1d(self):
+    def testEstimatePCollection1d(self):
         if IGNORE_TESTS:
             return
         NUM_COMPONENT = 2
         NUM_DIM = 1
         VARIANCE = 0.5
         MEANS = np.array([0, 10])
-        mixture_entropy = MixtureEntropy(
-            num_component=NUM_COMPONENT,
-            random_state=42
-        )
+        random = RandomMixture(num_component=NUM_COMPONENT, random_state=42)
         sample_arr = self.makeMixture(num_dim=NUM_DIM, num_component=NUM_COMPONENT, variance=VARIANCE)
-        mixture_entropy.fit(sample_arr)
-        trues = [any([np.abs(m - x) < 0.1 for m in MEANS]) for x in mixture_entropy.mean_arr]
-        self.assertTrue(all(trues), f"Means do not match: {mixture_entropy.mean_arr} != {MEANS}")
-        flat_covariances = np.array(mixture_entropy.covariance_arr).flatten()
+        pcollection = random.estimatePCollection(sample_arr)
+        mean_arr, covariance_arr, weight_arr = pcollection.getAll()
+        trues = [any([np.abs(m - x) < 0.1 for m in MEANS]) for x in mean_arr]
+        self.assertTrue(all(trues), f"Means do not match: {mean_arr} != {MEANS}")
+        flat_covariances = np.array(covariance_arr).flatten()
         trues = np.isclose(np.abs(flat_covariances), VARIANCE, atol=0.1)
         self.assertTrue(all(trues), f"Covariances do not match: {flat_covariances} != {VARIANCE}")
 
-    def testFit2d(self):
+    def testEstimatePCollection2d(self):
         if IGNORE_TESTS:
             return
         NUM_COMPONENT = 2
@@ -136,20 +103,18 @@ class TestRandomMixture(unittest.TestCase):
         COVARIANCE = -0.5
         MEANS = np.array([ [12, 14], [2, 4]])
         for idx in range(2):
-            mixture_entropy = MixtureEntropy(
-                num_component=NUM_COMPONENT,
-                random_state=42
-            )
+            random = RandomMixture(num_component=NUM_COMPONENT, random_state=42)
             sample_arr = self.makeMixture(num_dim=NUM_DIM, num_component=NUM_COMPONENT, variance=VARIANCE,
                     covariance=COVARIANCE)
-            mixture_entropy.fit(sample_arr)
-            flat_covariances = np.abs(np.array(mixture_entropy.covariance_arr).flatten())
+            pcollection = random.estimatePCollection(sample_arr)
+            mean_arr, covariance_arr, weight_arr = pcollection.getAll()
+            flat_covariances = np.abs(np.array(covariance_arr).flatten())
             frac = np.mean(np.isclose(np.abs(flat_covariances), VARIANCE, atol=0.2))
             if frac < 0.5:
                 print(f"Iteration {idx}: Covariances do not match: {flat_covariances} != {VARIANCE}")
             self.assertGreater(frac, 0.6, f"Covariances do not match: {flat_covariances} != {VARIANCE}")
             # Means
-            flattened_sorted_means = np.array(mixture_entropy.mean_arr).flatten()
+            flattened_sorted_means = np.array(mean_arr).flatten()
             flattened_sorted_means.sort()
             flattened_sorted_expected_means = MEANS.flatten()
             flattened_sorted_expected_means.sort()
@@ -157,28 +122,51 @@ class TestRandomMixture(unittest.TestCase):
                 is_true = np.abs(actual - expected) < 0.1
                 if not is_true:
                     print(f"Actual mean {actual} does not match expected mean {expected}")
-                self.assertTrue(is_true, f"Means do not match: {mixture_entropy.mean_arr} != {MEANS}")
+                self.assertTrue(is_true, f"Means do not match: {mean_arr} != {MEANS}")
 
-    def testMakeDensity1Component1Dimension(self):
+    def testMakeDistribution1Component1Dimension(self):
         if IGNORE_TESTS:
             return
         MEAN_ARR = np.reshape(np.array([5]), (1, -1))
         COVARIANCE_ARR = np.reshape(np.array([0.5]), (1, -1))
-        result = MixtureEntropy.calculateMixtureEntropy(
-                mean_arr=MEAN_ARR,
-                covariance_arr=COVARIANCE_ARR,
-                weight_arr=np.array([1]))
-        expected_Hx =  MixtureEntropy.calculateUnivariateGaussianEntropy(COVARIANCE_ARR[0])
-        self.assertAlmostEqual(expected_Hx, result.Hx, delta=0.1)
+        pcollection = PCollectionMixture(
+            mean_arr=MEAN_ARR,
+            covariance_arr=COVARIANCE_ARR,
+            weight_arr=np.array([1])
+        )
+        dcollection = self.random.makeDCollection(pcollection=pcollection)
+        expected_entropy = self.random.calculateEntropy(pcollection)
+        self.assertAlmostEqual(dcollection.get(cn.DC_ENTROPY), expected_entropy, delta=0.1)
 
     def testCalculateUnivariateGaussianEntropy(self):
         if IGNORE_TESTS:
             return
         # Test the calculation of univariate Gaussian entropy
-        variance = 0.5
-        expected_entropy = MixtureEntropy.calculateUnivariateGaussianEntropy(variance)
-        calculated_entropy = MixtureEntropy.calculateUnivariateGaussianEntropy(variance)
-        self.assertAlmostEqual(expected_entropy, calculated_entropy, delta=0.01)
+        ##
+        def calculate(variance:float) -> float:
+            pcollection = PCollectionMixture(covariance_arr=np.array([variance]))
+            return self.random.calculateEntropy(pcollection)
+        ##
+        variances = range(1, 10)
+        last_entropy = calculate(variances[0])
+        for variance in variances[1:]:
+            entropy = calculate(variance)
+            self.assertGreater(entropy, last_entropy, f"Entropy should increase with variance: {entropy} <= {last_entropy}")
+            last_entropy = entropy
+
+    def makeDistribution(self, mean_arr:np.ndarray, covariance_arr:np.ndarray, weight_arr:np.ndarray
+            ) -> Tuple[np.ndarray, np.ndarray, float, PCollectionMixture]:
+        """
+        Creates a distribution from the given parameters and returns variate, density, and entropy.
+        """
+        pcollection = PCollectionMixture(
+            mean_arr=mean_arr,
+            covariance_arr=covariance_arr,
+            weight_arr=weight_arr
+        )
+        dcollection = self.random.makeDCollection(pcollection)
+        variate_arr, density_arr, dx_arr, entropy = dcollection.getAll()
+        return variate_arr, density_arr, entropy, pcollection
     
     def testMakeDensity2Component1Dimension(self):
         # Evaluates calculations for 1-dimensional mixture and multiple components to the mixture.
@@ -191,21 +179,17 @@ class TestRandomMixture(unittest.TestCase):
             covariance_arr = np.array([(n+1)*0.1 for n in range(num_component)])
             covariance_arr = np.reshape(covariance_arr, (-1, 1))
             weight_arr = np.repeat(1/num_component, num_component)
-            result = MixtureEntropy.calculateMixtureEntropy(
-                    mean_arr=mean_arr,
-                    covariance_arr=covariance_arr,
-                    weight_arr=weight_arr)
-            expected_Hx =  MixtureEntropy.calculateUnivariateGaussianEntropy(covariance_arr[0])
+            variate_arr, density_arr, entropy, pcollection = self.makeDistribution(mean_arr=mean_arr,
+                    covariance_arr=covariance_arr, weight_arr=weight_arr)
             if IS_PLOT:
-                plt.plot(result.variate_arr, result.pdf_arr)
+                plt.plot(variate_arr, density_arr)
                 plt.title("Mixture Density")
                 plt.xlabel("Value")
                 plt.ylabel("Density")
                 plt.show()
             # Assume that all weights are equal
-            expected_Hx = np.sum(MixtureEntropy.calculateUnivariateGaussianEntropy(covariance_arr.flatten()) * weight_arr)  \
-                    - np.log2(weight_arr[0])
-            self.assertAlmostEqual(expected_Hx, result.Hx, delta=0.1)
+            expected_entropy = self.random.calculateEntropy(pcollection)
+            self.assertAlmostEqual(expected_entropy, entropy, delta=0.1)
         ##
         test(10)
         test(3)
@@ -223,18 +207,16 @@ class TestRandomMixture(unittest.TestCase):
             np.fill_diagonal(covariance_arr, diagonal_arr)
             covariance_arr = np.reshape(covariance_arr, (1, num_dimension, num_dimension))
             weight_arr = np.array([1])
-            result = MixtureEntropy.calculateMixtureEntropy(
-                    mean_arr=mean_arr,
-                    covariance_arr=covariance_arr,
-                    weight_arr=weight_arr)
+            variate_arr, density_arr, entropy, pcollection = self.makeDistribution(mean_arr=mean_arr,
+                    covariance_arr=covariance_arr, weight_arr=weight_arr)
             if IS_PLOT:
-                plt.plot(result.variate_arr, result.pdf_arr)
+                plt.plot(variate_arr, density_arr)
                 plt.title("Mixture Density")
                 plt.xlabel("Value")
                 plt.ylabel("Density")
                 plt.show()
-            expected_Hx = MixtureEntropy.calculateMultivariateGaussianEntropy(covariance_arr[0])
-            self.assertAlmostEqual(expected_Hx, result.Hx, delta=0.1)
+            expected_entropy = self.random.calculateEntropy(pcollection)
+            self.assertAlmostEqual(expected_entropy, entropy, delta=0.1)
         ##
         test(6)
         test(2)
@@ -252,12 +234,10 @@ class TestRandomMixture(unittest.TestCase):
             np.fill_diagonal(covariance_arr, diagonal_arr)
             covariance_arr = np.array([covariance_arr]*num_component)
             weight_arr = np.repeat(1/num_component, num_component)
-            result = MixtureEntropy.calculateMixtureEntropy(
-                    mean_arr=mean_arr,
-                    covariance_arr=covariance_arr,
-                    weight_arr=weight_arr)
+            variate_arr, density_arr, entropy, pcollection = self.makeDistribution(mean_arr=mean_arr,
+                    covariance_arr=covariance_arr, weight_arr=weight_arr)
             if IS_PLOT:
-                plt.plot(result.variate_arr, result.pdf_arr)
+                plt.plot(variate_arr, density_arr)
                 plt.title("Mixture Density")
                 plt.xlabel("Value")
                 plt.ylabel("Density")
@@ -273,14 +253,14 @@ class TestRandomMixture(unittest.TestCase):
             return
         num_component = 1
         sample_arr = self.makeMixture(num_dim=5, num_component=num_component, variance=1.5)
-        mixture_entropy = MixtureEntropy(
+        mixture_entropy = RandomMixture(
             num_component=num_component,
             random_state=42
         )
-        mixture_entropy.fit(sample_arr)
-        mixture_entropy.calculateMixtureModelEntropy()
-        expected_Hx = MixtureEntropy.calculateMultivariateGaussianEntropy(mixture_entropy.covariance_arr[0])
-        self.assertAlmostEqual(expected_Hx, mixture_entropy.Hx, delta=0.01)
+        pcollection = self.random.estimatePCollection(sample_arr)
+        expected_entropy = self.random.calculateEntropy(pcollection)
+        dcollection = self.random.makeDCollection(pcollection=pcollection)
+        self.assertAlmostEqual(expected_entropy, dcollection.get(cn.DC_ENTROPY), delta=0.01)
 
 
 if __name__ == '__main__':

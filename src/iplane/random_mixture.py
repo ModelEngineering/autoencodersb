@@ -1,157 +1,17 @@
 '''Random mixture of Gaussian distribution.'''
 import iplane.constants as cn  # type: ignore
 from iplane.random import Random, PCollection, DCollection
+from iplane.random_mixture_collection import PCollectionMixture, DCollectionMixture  # type: ignore
 
-import collections
 import itertools
 import pandas as pd  # type: ignore
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import multivariate_normal # type: ignore
-from sklearn.model_selection import train_test_split # type: ignore
 from sklearn.mixture import GaussianMixture  # type: ignore
-from scipy.stats import norm # type: ignore
-from typing import Any, List, Tuple, Optional, Union, Dict, cast, overload
+from typing import Any, List, Tuple, Optional, Dict, cast
 
 
-################################################
-class PCollectionMixture(PCollection):
-    # Parameter collection for mixture of Gaussian distributions.
-    # Instance variables:
-    #   collection_names: list of all names of parameters
-    #   dct: dictionary of subset name-value pairs
-
-    def __init__(self, parameter_dct:Optional[Dict[str, Any]]=None)->None:
-        """
-        Args:
-            parameter_dct (Optional[Dict[str, Any]], optional): parameter name-value pairs.
-        """
-        super().__init__(cn.PC_MIXTURE_NAMES, parameter_dct)
-
-    def isAnyNull(self) -> bool:
-        """Check if any parameter value is None."""
-        for key in cn.PC_MIXTURE_NAMES:
-            if key not in self.dct or self.dct[key] is None:
-                return True
-        return False
-    
-    def getComponentAndDimension(self) -> Tuple[int, int]:
-        """
-        Finds the number of components and dimensions for the gaussian distribution.
-
-        Returns:
-            Tuple[int, int]: Number of components and number of dimensions for the multivariate distribution.
-        """
-        if self.isAnyNull():
-            raise ValueError("Parameter dictionary must contain mean_arr, covariance_arr, and weight_arr.")
-        mean_arr, covariance_arr, weight_arr = cast(np.ndarray, self.dct.get(cn.PC_MEAN_ARR)),   \
-                cast(np.ndarray, self.dct.get(cn.PC_COVARIANCE_ARR)), cast(np.ndarray, self.dct.get(cn.PC_WEIGHT_ARR))
-        # Consistent number of components and dimensions
-        if weight_arr.ndim != 1:
-            raise ValueError("Weight must have 1 dimension.")
-        is_correct_shape = False
-        if mean_arr.ndim == 2 and covariance_arr.ndim == 3:
-            is_correct_shape = True
-        elif mean_arr.ndim == 1 and covariance_arr.ndim == 1:
-            is_correct_shape = True
-        if not is_correct_shape:
-            raise ValueError("Either mean_arr must be 2D and covariance_arr must be 3D, or both must be 1D.")
-        num_component = mean_arr.shape[0]
-        num_dimension = mean_arr.shape[1] if mean_arr.ndim == 2 else 1
-        if not np.all([mean_arr.shape[0], covariance_arr.shape[0], weight_arr.shape[0]] == [num_component] * 3):
-            raise ValueError("Mean, covariance, and weight arrays must have the same number of components.")
-        #
-        return num_component, num_dimension
-
-    def __eq__(self, other:Any) -> bool:
-        """Check if two ParameterMGaussian objects are equal."""
-        if not isinstance(other, PCollectionMixture):
-            return False
-        # Check if all expected parameters are present and equal
-        for key in cn.PC_MIXTURE_NAMES:
-            if key not in self.dct or key not in other.dct:
-                return False
-            if np.all(self.dct[key]  != other.dct[key]):
-                return False
-            if not np.allclose(self.dct[key].flatten(), other.dct[key].flatten()):
-                return False
-        return True
-    
-    def select(self, dimensions:List[int]) -> 'PCollectionMixture':
-        """
-        Selects a subset of the parameters based on the provided indices.
-
-        Args:
-            indices (List[int]): List of indices to select from the parameter collection.
-
-        Returns:
-            PCollectionMixture: A new PCollectionMixture object with the selected parameters.
-        """
-        # Check if the dimensions are valid
-        self.isValid()
-        num_component, num_dimension = self.getComponentAndDimension()
-        if max(dimensions) >= num_dimension:
-            raise ValueError(f"Dimensions must be less than {num_dimension}. Provided dimensions: {dimensions}")
-        # Create the new PCollectionMixture with selected dimensions
-        indices = np.array(dimensions, dtype=int)
-        dct = dict(self.dct)
-        dct[cn.PC_MEAN_ARR] = dct[cn.PC_MEAN_ARR][:, indices] if dct[cn.PC_MEAN_ARR].ndim == 2 else dct[cn.PC_MEAN_ARR][indices]
-        dct[cn.PC_COVARIANCE_ARR] = dct[cn.PC_COVARIANCE_ARR][indices, :] if dct[cn.PC_COVARIANCE_ARR].ndim == 2 else dct[cn.PC_COVARIANCE_ARR][indices]
-        if len(dimensions) == 1:
-            dct[cn.PC_MEAN_ARR] = dct[cn.PC_MEAN_ARR].reshape(num_component)
-            dct[cn.PC_COVARIANCE_ARR] = dct[cn.PC_COVARIANCE_ARR].reshape(num_component)
-        return PCollectionMixture(dct)
-    
-    def isValid(self) -> bool:
-        return True
-
-
-################################################
-class DCollectionMixture(DCollection):
-    # Distribution collection for mixture of Gaussian distributions.
-
-    def __init__(self, collection_dct:Optional[Dict[str, Any]]=None)->None:
-        super().__init__(cn.DC_MIXTURE_NAMES, collection_dct)
-        # Initialize the properties
-        self.density_arr = self.dct.get(cn.DC_DENSITY_ARR, None)
-        self.variate_arr = self.dct.get(cn.DC_VARIATE_ARR, None)
-        self.dx_arr = self.dct.get(cn.DC_DX_ARR, None)
-        self.entropy = self.dct.get(cn.DC_ENTROPY, None)
-        # Consistency checks
-    
-    def isValid(self) -> bool:
-        if self.variate_arr is None:
-            return False
-        if self.density_arr is None:
-            return False
-        if self.dx_arr is None:
-            return False
-        num_component = self.variate_arr.shape[0]
-        if self.variate_arr.ndim == 1:
-            num_dimension = 1
-        elif self.variate_arr.ndim == 2:
-            num_dimension = self.variate_arr.shape[1]
-        else:
-            raise ValueError("Variate array must be 1D or 2D.")
-        #
-        if num_dimension == 1:
-            if self.density_arr.ndim != 1:
-                return False
-            if self.dx_arr.ndim != 1:
-                return False
-        elif num_dimension > 1:
-            if self.density_arr.ndim != 2:
-                return False
-            if self.dx_arr.ndim != 1:
-                return False
-            if self.dx_arr.shape[0] != num_dimension:
-                return False
-            if self.density_arr.shape[0] != num_dimension:
-                return False
-        return True
-
-
-################################################
 class RandomMixture(Random):
     """Handles Gaussian Mixture Models."""
 
@@ -192,9 +52,7 @@ class RandomMixture(Random):
             np.array (num_sample, 1), int. total count is = sum(num_samples)
         """
         parameter = cast(PCollectionMixture, pcollection)
-        mean_arr, covariance_arr, weight_arr = (cast(np.ndarray, parameter.dct.get(cn.PC_MEAN_ARR, None)),
-                                                cast(np.ndarray, parameter.dct.get(cn.PC_COVARIANCE_ARR, None)),
-                                                cast(np.ndarray, parameter.dct.get(cn.PC_WEIGHT_ARR, None)))
+        mean_arr, covariance_arr, weight_arr = pcollection.getAll()
         num_component, num_dimension = parameter.getComponentAndDimension()
         # Calculate samples based on the Guassian mixure parameters.
         sample_arr = cast(np.ndarray, int(num_sample * weight_arr))
@@ -225,9 +83,7 @@ class RandomMixture(Random):
         """
         # Checks
         num_component, num_dimension = pcollection.getComponentAndDimension()
-        mean_arr = cast(np.ndarray, pcollection.dct.get(cn.PC_MEAN_ARR, None))
-        covariance_arr = cast(np.ndarray, pcollection.dct.get(cn.PC_COVARIANCE_ARR,None))
-        weight_arr = cast(np.ndarray, pcollection.dct.get(cn.PC_WEIGHT_ARR, None))
+        mean_arr, covariance_arr, weight_arr = pcollection.getAll()
         # Calculate the number of samples for each dimension
         num_sample = int(self.max_num_sample**(1/num_dimension))
         if num_sample < 8:
@@ -283,7 +139,7 @@ class RandomMixture(Random):
         Returns:
             float: Entropy of the Gaussian distribution.
         """
-        covariance_arr = pcollection.dct.get(cn.PC_COVARIANCE_ARR, None)
+        covariance_arr = pcollection.get(cn.PC_COVARIANCE_ARR)
         if covariance_arr is None:
             raise ValueError("Covariance array must be provided.")
         #
@@ -321,5 +177,5 @@ class RandomMixture(Random):
             cn.PC_MEAN_ARR: self.gmm.means_, 
             cn.PC_COVARIANCE_ARR: self.gmm.covariances_,
             cn.PC_WEIGHT_ARR: self.gmm.weights_}
-        self.pcollection = PCollectionMixture(dct)
+        self.pcollection = PCollectionMixture(**dct)
         return self.pcollection

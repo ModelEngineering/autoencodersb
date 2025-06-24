@@ -14,28 +14,23 @@ class PCollectionDiscrete(PCollection):
 
     def __init__(self, parameter_dct:Optional[Dict[str, Any]]=None)->None:
         super().__init__(cn.PC_DISCRETE_NAMES, parameter_dct)
-    
-    def isValid(self) -> bool:
-        """Check if the parameter collection is valid."""
-        # Check if all parameters are of the correct type
-        if len(self.dct) != len(cn.PC_DISCRETE_NAMES):
-            return False
-        if np.array(self.dct[cn.PC_CATEGORY_ARR]).ndim != 1:
-            return False
-        return True
 
     def __eq__(self, other:Any) -> bool:
         """Check if two ParameterMGaussian objects are equal."""
         if not isinstance(other, PCollectionDiscrete):
             return False
         # Check if all expected parameters are present and equal
+        if not self.isAllValid() or not other.isAllValid():
+            return False
         for key in cn.PC_DISCRETE_NAMES:
-            if key not in self.dct or key not in other.dct:
-                return False
-            if np.all(self.dct[key]  != other.dct[key]):
-                return False
-            if not np.allclose(self.dct[key].flattern(), other.dct[key].flatten()):
-                return False
+            this_value = self.get(key)
+            other_value = other.get(key)
+            if isinstance(this_value, np.ndarray):
+                if not np.allclose(this_value.flatten(), other_value.flatten()):
+                    return False
+            else:
+                if not np.isclose(this_value, other_value):
+                    return False
         return True
 
 

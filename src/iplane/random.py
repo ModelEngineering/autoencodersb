@@ -25,19 +25,50 @@ class Collection(object):
         """
         self.collection_names = collection_names
         if collection_dct is None:
-            collection_dct = {}
+            self.collection_dct = {}
         else:
-            self.isValidDct(self.collection_names, collection_dct)
-        self.dct: Dict[str, Any] = dict(collection_dct)
+            self.collection_dct = collection_dct
+        if not self.isValid():
+            raise ValueError(f"Collection dictionary must contain all expected keys: {self.collection_names}")
 
     def get(self, name:str) -> Any:
         """Get the value of a parameter by its name."""
-        return self.dct.get(name, None)
+        return self.collection_dct.get(name, None)
 
-    @staticmethod
-    def isValidDct(parameter_names:List[str], dct:Dict[str, Any]) -> bool:
-        """Check if the parameter dictionary contains all expected keys."""
-        return all(key in parameter_names for key in dct)
+    def isValid(self) -> bool:
+        """Check if the dictionary contains only valid keys."""
+        trues =  [key in self.collection_names for key in self.collection_dct.keys()]
+        return all(trues)
+
+    def isAllValid(self) -> bool:
+        """Check if the parameter dictionary contains all expected keys and values are non-null."""
+        for key in self.collection_names:
+            if not key in self.collection_dct:
+                return False
+            if self.collection_dct[key] is None:
+                return False
+            if self.collection_dct[key] == np.nan:
+                return False
+        return True
+
+    def __eq__(self, other:Any) -> bool:
+        """Check if two Collection objects are equal."""
+        if not str(type(self)) == str(type(other)):
+            raise RuntimeError(f"Cannot compare {str(type(self))} with {str(type(other))}.")
+        # Check if all expected parameters are present and equal
+        if not self.isAllValid() or not other.isAllValid():
+            return False
+        # Compare the values
+        for key in self.collection_names:
+            this_value = self.get(key)
+            other_value = other.get(key)
+            if isinstance(this_value, np.ndarray):
+                if not np.allclose(this_value.flatten(), other_value.flatten()):
+                    return False
+            else:
+                if not np.isclose(this_value, other_value):
+                    return False
+        return True
 
 
 ############################################
@@ -46,30 +77,13 @@ class PCollection(Collection):
 
     def add(self, collection_dct:Dict[str, Any]) -> None:
         """Add a key-value pair to the parameter."""
-        self.dct.update(collection_dct)
-    
-    def isValid(self) -> bool:
-        raise NotImplementedError("isValid must be implemented in subclasses.")
-    
-    def __eq__(self, other:Any) -> bool:
-        """Check if two Parameter objects are equal."""
-        raise NotImplementedError("Equality check must be implemented in subclasses.")
+        self.collection_dct.update(collection_dct)
     
 
 ############################################
 class DCollection(Collection):
     """Container for the representation and properties of a distribution"""
-        
-    def __eq__(self, other:Any) -> bool:
-        """Check if two Parameter objects are equal."""
-        if not isinstance(other, DCollection):
-            return False
-        if (not ENTROPY in self.dct) or (not ENTROPY not in other.dct):
-            return False
-        return bool(np.isclose(self.dct[ENTROPY], other.dct[ENTROPY], atol=1e-8))
-    
-    def isValid(self) -> bool:
-        raise NotImplementedError("isValid must be implemented in subclasses.")
+    pass
 
 
 ############################################
