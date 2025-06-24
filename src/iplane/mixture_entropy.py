@@ -3,13 +3,14 @@ import iplane.constants as cn  # type: ignore
 
 import collections
 import itertools
+import pandas as pd  # type: ignore
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import multivariate_normal # type: ignore
 from sklearn.model_selection import train_test_split # type: ignore
 from sklearn.mixture import GaussianMixture  # type: ignore
 from scipy.stats import norm # type: ignore
-from typing import List, Optional, Union # type: ignore
+from typing import List, Optional, Union, Dict # type: ignore
 
 
 # Define a named tuple for the density
@@ -22,19 +23,19 @@ class MixtureEntropy(object):
     """Calculate entropy for a mixture of distributions."""
 
     def __init__(self,
-            n_components:int = 2,
+            num_component:int = 2,
             random_state:int = 42,
             ):
         """
         Initializes the MixtureEntropy object.
         Args:
-            n_components (int): number of components in the mixture model.
+            num_component (int): number of components in the mixture model.
             random_state (int): random state for reproducibility.
         """
-        self.n_components = n_components
+        self.num_component = num_component
         self.random_state = random_state
         # Use k-means clustering to initialize the Gaussian Mixture Model
-        self.gmm = GaussianMixture(n_components=n_components, random_state=random_state)
+        self.gmm = GaussianMixture(n_components=num_component, random_state=random_state)
         # Calculated
         self.Hx = np.nan
         self.pdf_arr = np.array([])
@@ -84,22 +85,32 @@ class MixtureEntropy(object):
             sample_arr:np.ndarray,
             mean_arr:np.ndarray,
             covariance_arr:np.ndarray,
+            categories:Optional[pd.DataFrame]=None,
             )-> np.ndarray:
         """
         Generates synthetic data for a multidimensional Gaussian Mixture Model.
             Each Gaussian component is defined by its mean and covariance marix.
             Components are indexed by the first array index
             Dimensions are indexed by the second array index for mean.
-            For covariance, there is a third index for the covariance matrix.
 
-        Args:
-            sample_arr (np.ndarray): Number of samples to generate for each component.
-            mean_arr (np.ndarray): Mean of each Gaussian component.
-            covariance_arr (np.ndarray): Covariance matrix for each Gaussian component.
+        Args: N is number of components, D is number of dimensions, K is number of categories.
+            sample_arr (np.ndarray N): Number of samples to generate for each component.
+            mean_arr (np.ndarray N X D): Mean of each Gaussian component.
+            covariance_arr (np.ndarray N X D X D): Covariance matrix for each Gaussian component.
+                    if D = 1, then covariance_arr is N X 1
+            categories (Optional[DataFrame]): Optional dictionary mapping categories to weights.
+                    Columns:
+                        - 'category': category name
+                        - 'probability': probability of the category
+                        - 'mean': shift in mean for the category
 
         Returns:
             np.array (num_sample, 1), int. total count is = sum(num_samples)
         """
+        CATEGORY = 'category'
+        PROBABILITY = 'probability'
+        MEAN = 'mean'
+        # Checks
         if np.std([np.shape(covariance_arr)[0], len(sample_arr), len(mean_arr)]) != 0:
             raise ValueError("Covariance, sample, and mean arrays must have the same number of components.")
         num_component = len(sample_arr)
@@ -118,7 +129,7 @@ class MixtureEntropy(object):
         merged_arr = np.random.permutation(merged_arr)
         return merged_arr
     
-    def calculateEntropy(self):
+    def calculateMixtureModelEntropy(self):
         """Calculates the entropy of the Gaussian Mixture Model.
         Updates self.Hx and distribution information
 
@@ -268,7 +279,7 @@ class MixtureEntropy(object):
         self.gmm.fit(sample_arr)
 
     @staticmethod
-    def makeConvariance(stds:List[float])->np.ndarray:
+    def makeCovariance(stds:List[float])->np.ndarray:
         """
         Creates a covariance matrix for the Gaussian Mixture Model.
 

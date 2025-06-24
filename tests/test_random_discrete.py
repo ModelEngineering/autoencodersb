@@ -1,4 +1,4 @@
-from iplane.categorical_entropy import CategoricalEntropy  # type: ignore
+from iplane.random_discrete import RandomDiscrete  # type: ignore
 
 import numpy as np
 from typing import List, Any
@@ -14,19 +14,19 @@ class TestCategoricalEntropy(unittest.TestCase):
 
     def setUp(self):
         """Set up the test case."""
-        self.categorical_entropy = CategoricalEntropy()
+        self.discrete = RandomDiscrete()
 
     def testConstructor(self):
-        self.assertTrue(hasattr(self.categorical_entropy, 'entropy'))
+        self.assertTrue(hasattr(self.discrete, 'entropy'))
 
     def testCalculate(self):
         ##
         def test(val:int):
             """Helper function to test entropy calculation."""
             arr = np.random.randint(0, val, NUM_SAMPLE)
-            self.categorical_entropy.calculate(arr)
-            self.assertEqual(len(self.categorical_entropy.categories), val)
-            self.assertAlmostEqual(self.categorical_entropy.entropy, np.log2(val), delta=0.1)
+            self.discrete.estimatePCollection(arr)
+            self.assertEqual(len(self.discrete.categories), val)
+            self.assertAlmostEqual(self.discrete.entropy, np.log2(val), delta=0.1)
         ##
         test(2)
         test(10)
@@ -37,7 +37,7 @@ class TestCategoricalEntropy(unittest.TestCase):
         def test(val:int):
             """Helper function to test entropy calculation."""
             arr = np.random.randint(0, val, NUM_SAMPLE)
-            Hx = self.categorical_entropy.calculateEntropy(arr)
+            Hx = self.discrete.calculateEntropy(arr)
             self.assertAlmostEqual(Hx, np.log2(val), delta=0.1)
         ##
         test(2)
