@@ -6,7 +6,7 @@ nose2
 pandas
 pip
 scipy
-sklearn
 seaborn
 tabulate
 torch
+scikit-learn
