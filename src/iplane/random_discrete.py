@@ -7,26 +7,20 @@ import pandas as pd  # type: ignore
 import matplotlib.pyplot as plt
 from typing import Tuple, Any, Optional, Dict, List, cast
 
-CATEGORY_ARR = 'category_arr'
-PROBABILITY_ARR = 'probability_arr'
-PARAMETER_NAMES = [CATEGORY_ARR, PROBABILITY_ARR]
-ENTROPY = 'entropy'
-DISTRIBUTION_NAMES = [cn.ENTROPY]
-
 
 ################################################
 class PCollectionDiscrete(PCollection):
     # Parameter collection for mixture of Gaussian distributions.
 
     def __init__(self, parameter_dct:Optional[Dict[str, Any]]=None)->None:
-        super().__init__(PARAMETER_NAMES, parameter_dct)
+        super().__init__(cn.PC_DISCRETE_NAMES, parameter_dct)
     
     def isValid(self) -> bool:
         """Check if the parameter collection is valid."""
         # Check if all parameters are of the correct type
-        if len(self.dct) != len(PARAMETER_NAMES):
+        if len(self.dct) != len(cn.PC_DISCRETE_NAMES):
             return False
-        if np.array(self.dct[CATEGORY_ARR]).ndim != 1:
+        if np.array(self.dct[cn.PC_CATEGORY_ARR]).ndim != 1:
             return False
         return True
 
@@ -35,7 +29,7 @@ class PCollectionDiscrete(PCollection):
         if not isinstance(other, PCollectionDiscrete):
             return False
         # Check if all expected parameters are present and equal
-        for key in PARAMETER_NAMES:
+        for key in cn.PC_DISCRETE_NAMES:
             if key not in self.dct or key not in other.dct:
                 return False
             if np.all(self.dct[key]  != other.dct[key]):
@@ -51,7 +45,7 @@ class DCollectionDiscrete(DCollection):
 
 
     def __init__(self, parameter_dct:Optional[Dict[str, Any]]=None)->None:
-        super().__init__(DISTRIBUTION_NAMES, parameter_dct)
+        super().__init__(cn.DC_DISCRETE_NAMES, parameter_dct)
 
 
 ################################################
@@ -69,7 +63,7 @@ class RandomDiscrete(Random):
         """
         category_arr, count_arr = np.unique(sample_arr, return_counts=True)
         probability_arr = count_arr / len(sample_arr)
-        dct = {CATEGORY_ARR: category_arr, PROBABILITY_ARR: probability_arr }
+        dct = {cn.PC_CATEGORY_ARR: category_arr, cn.PC_PROBABILITY_ARR: probability_arr }
         return PCollectionDiscrete(dct)
     
     def makeDCollection(self, pcollection:PCollectionDiscrete) -> DCollectionDiscrete:
@@ -83,7 +77,7 @@ class RandomDiscrete(Random):
             DCollectionDiscrete:
         """
         entropy = self.calculateEntropy(pcollection)
-        self.dcollection = DCollectionDiscrete({cn.ENTROPY: entropy})
+        self.dcollection = DCollectionDiscrete({cn.DC_ENTROPY: entropy})
         return self.dcollection
 
     def plot(self, dcollection:Optional[DCollectionDiscrete]=None)->None:
@@ -98,10 +92,10 @@ class RandomDiscrete(Random):
         #
         dcollection = cast(DCollectionDiscrete, dcollection)
         plt.figure(figsize=(8, 6))
-        category_arr = dcollection.get(CATEGORY_ARR)
-        probability_arr = dcollection.get(PROBABILITY_ARR)
+        category_arr = dcollection.get(cn.PC_CATEGORY_ARR)
+        probability_arr = dcollection.get(cn.PC_PROBABILITY_ARR)
         plt.bar(category_arr, probability_arr, color='skyblue')
-        plt.title(f'Categorical Entropy: {dcollection.get(ENTROPY)}')
+        plt.title(f'Categorical Entropy: {dcollection.get(cn.DC_ENTROPY)}')
         plt.xlabel('Categories')
         plt.ylabel('Probability')
         plt.xticks(rotation=45)
@@ -117,5 +111,5 @@ class RandomDiscrete(Random):
         Returns:
             CategoricalEntropy: An instance with calculated entropy and categories.
         """
-        probability_arr = pcollection.get(PROBABILITY_ARR)
+        probability_arr = pcollection.get(cn.PC_PROBABILITY_ARR)
         return -np.sum(probability_arr * np.log2(probability_arr + 1e-10))

@@ -1,4 +1,17 @@
 import numpy as np
 NULL_ARR = np.array([])  # type: ignore
-ENTROPY = 'entropy'
 MAX_NUM_SAMPLE = int(1e7)
+# Collections
+DC_DENSITY_ARR = 'density_arr'
+DC_DX_ARR = 'dx_arr'
+DC_ENTROPY = 'entropy'
+DC_VARIATE_ARR = 'variate_arr'
+DC_DISCRETE_NAMES = [DC_ENTROPY]
+DC_MIXTURE_NAMES = [DC_ENTROPY, DC_VARIATE_ARR, DC_DENSITY_ARR, DC_VARIATE_ARR, DC_DX_ARR]
+PC_MEAN_ARR = 'mean_arr'
+PC_CATEGORY_ARR = 'category_arr'
+PC_COVARIANCE_ARR = 'covariance_arr'
+PC_PROBABILITY_ARR = 'probability_arr'
+PC_WEIGHT_ARR = 'weight_arr'
+PC_MIXTURE_NAMES = [PC_MEAN_ARR, PC_COVARIANCE_ARR, PC_WEIGHT_ARR]
+PC_DISCRETE_NAMES = [PC_CATEGORY_ARR, PC_PROBABILITY_ARR]

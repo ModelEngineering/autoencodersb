@@ -10,8 +10,8 @@ IS_PLOT = False
 NUM_SAMPLE = 1000
 
 
-class TestMixtureEntropy(unittest.TestCase):
-    """Test class for MixtureEntropy."""
+#######################################
+class TestPCollectionMixture(unittest.TestCase):
 
     def testParameterMGaussian(self):
         """Test the ParameterMGaussian class."""
@@ -23,9 +23,24 @@ class TestMixtureEntropy(unittest.TestCase):
             'weight_arr': np.array([0.5, 0.5]),
             'num_component': 2,
             'random_state': 42}
-        parameter = PCollectionMixture(parameter_dct=dct)
+        pcollection = PCollectionMixture(parameter_dct=dct)
         #
-        self.assertTrue(parameter == parameter)
+        self.assertTrue(pcollection == pcollection)
+
+
+#######################################
+class TestDCollectionMixture(unittest.TestCase):
+
+    def setUp(self):
+        pass
+
+
+
+#######################################
+class TestRandomMixture(unittest.TestCase):
+
+    def setUp(self):
+        self.random = RandomMixture()
 
     def makeMixture(self,
             num_component:int=2,
@@ -51,7 +66,12 @@ class TestMixtureEntropy(unittest.TestCase):
                 means.append(10 * n_component)
         mean_arr = np.array(means)
         covariance_arr = np.array(covariances)
-        arr = MixtureEntropy.generateMixture(
+        dct = {
+            'mean_arr': mean_arr,
+            'covariance_arr': covariance_arr,
+            'weight_arr': np.repeat(1/num_component, num_component),
+            }
+        arr = self.random.generateSample(
             sample_arr=sample_arr,
             mean_arr=mean_arr,
             covariance_arr=covariance_arr)
