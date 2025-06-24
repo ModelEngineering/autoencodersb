@@ -91,7 +91,7 @@ class PCollectionMixture(PCollection):
                 return False
             if np.all(self.dct[key]  != other.dct[key]):
                 return False
-            if not np.allclose(self.dct[key].flattern(), other.dct[key].flatten()):
+            if not np.allclose(self.dct[key].flatten(), other.dct[key].flatten()):
                 return False
         return True
     

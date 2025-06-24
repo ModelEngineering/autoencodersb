@@ -16,17 +16,13 @@ class TestCategoricalEntropy(unittest.TestCase):
         """Set up the test case."""
         self.discrete = RandomDiscrete()
 
-    def testConstructor(self):
-        self.assertTrue(hasattr(self.discrete, 'entropy'))
-
     def testCalculate(self):
         ##
         def test(val:int):
             """Helper function to test entropy calculation."""
             arr = np.random.randint(0, val, NUM_SAMPLE)
-            self.discrete.estimatePCollection(arr)
-            self.assertEqual(len(self.discrete.categories), val)
-            self.assertAlmostEqual(self.discrete.entropy, np.log2(val), delta=0.1)
+            pcollection = self.discrete.estimatePCollection(arr)
+            self.assertEqual(len(pcollection.get('category_arr')), val)
         ##
         test(2)
         test(10)
@@ -37,8 +33,10 @@ class TestCategoricalEntropy(unittest.TestCase):
         def test(val:int):
             """Helper function to test entropy calculation."""
             arr = np.random.randint(0, val, NUM_SAMPLE)
-            Hx = self.discrete.calculateEntropy(arr)
-            self.assertAlmostEqual(Hx, np.log2(val), delta=0.1)
+            pcollection = self.discrete.estimatePCollection(arr)
+            dcollection = self.discrete.makeDCollection(pcollection)
+            entropy = dcollection.get('entropy')
+            self.assertAlmostEqual(entropy, np.log2(val), delta=0.1)
         ##
         test(2)
         test(10)

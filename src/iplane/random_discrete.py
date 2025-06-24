@@ -1,7 +1,6 @@
 '''Discrete (finite) random variables.'''
 import iplane.constants as cn
-from iplane.collection import PCollection, DCollection  # type: ignore
-from iplane.random import Random  # type: ignore
+from iplane.random import Random, PCollection, DCollection  # type: ignore
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -24,8 +23,6 @@ class PCollectionDiscrete(PCollection):
     
     def isValid(self) -> bool:
         """Check if the parameter collection is valid."""
-        if self.isAnyNull():
-            return False
         # Check if all parameters are of the correct type
         if len(self.dct) != len(PARAMETER_NAMES):
             return False
@@ -52,13 +49,9 @@ class PCollectionDiscrete(PCollection):
 class DCollectionDiscrete(DCollection):
     # Distribution collection for mixture of Gaussian distributions.
 
+
     def __init__(self, parameter_dct:Optional[Dict[str, Any]]=None)->None:
-        super().__init__(parameter_dct)
-        if parameter_dct is not None:
-            self.isValidDct(parameter_dct, PARAMETER_NAMES)
-        super().__init__(parameter_dct)
-        # Initialize the properties
-        self.entropy = self.dct.get(ENTROPY, None)
+        super().__init__(DISTRIBUTION_NAMES, parameter_dct)
 
 
 ################################################
@@ -79,7 +72,7 @@ class RandomDiscrete(Random):
         dct = {CATEGORY_ARR: category_arr, PROBABILITY_ARR: probability_arr }
         return PCollectionDiscrete(dct)
     
-    def makeDCollection(self, pcollection:PCollection) -> DCollectionDiscrete:
+    def makeDCollection(self, pcollection:PCollectionDiscrete) -> DCollectionDiscrete:
         """Calculates entropy for the discrete random variable.
 
         Args:
@@ -124,4 +117,5 @@ class RandomDiscrete(Random):
         Returns:
             CategoricalEntropy: An instance with calculated entropy and categories.
         """
-        return -np.sum(pcollection.probability_arr * np.log2(pcollection.probability_ser + 1e-10))
+        probability_arr = pcollection.get(PROBABILITY_ARR)
+        return -np.sum(probability_arr * np.log2(probability_arr + 1e-10))

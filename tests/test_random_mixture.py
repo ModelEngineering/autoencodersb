@@ -25,9 +25,7 @@ class TestMixtureEntropy(unittest.TestCase):
             'random_state': 42}
         parameter = PCollectionMixture(parameter_dct=dct)
         #
-        true = parameter == parameter
-        import pdb; pdb.set_trace()
-        pass
+        self.assertTrue(parameter == parameter)
 
     def makeMixture(self,
             num_component:int=2,

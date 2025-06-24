@@ -35,7 +35,7 @@ class Collection(object):
         return self.dct.get(name, None)
 
     @staticmethod
-    def isValidDct(parameter_names:List[str], dct) -> bool:
+    def isValidDct(parameter_names:List[str], dct:Dict[str, Any]) -> bool:
         """Check if the parameter dictionary contains all expected keys."""
         return all(key in parameter_names for key in dct)
 
