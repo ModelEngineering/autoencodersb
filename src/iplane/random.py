@@ -8,7 +8,7 @@ a Parameter object appropriate for these methods. Generated distributions are st
 import iplane.constants as cn
 
 import numpy as np
-from typing import Tuple, Any, Optional, Dict, List
+from typing import Any, Optional, Dict, List
 
 ENTROPY = 'entropy'
 
@@ -23,11 +23,11 @@ class Collection(object):
             collection_names (List[str]): Names of all parameters
             collection_dct (Optional[Dict[str, Any]], optional): parameter name-value pairs.
         """
-        self.collection_names = collection_names
+        self.collection_names = list(collection_names)
         if collection_dct is None:
             self.collection_dct = {}
         else:
-            self.collection_dct = collection_dct
+            self.collection_dct = dict(collection_dct)
         if not self.isValid():
             raise ValueError(f"Collection dictionary must contain all expected keys: {self.collection_names}")
 
@@ -47,9 +47,24 @@ class Collection(object):
                 return False
             if self.collection_dct[key] is None:
                 return False
-            if self.collection_dct[key] == np.nan:
-                return False
+            value = self.collection_dct[key]
+            if isinstance(value, np.ndarray):   
+                if value.size == 0 or np.isnan(value).any():
+                    return False
+            elif isinstance(value, (int, float)):
+                if np.isnan(value):
+                    return False
+            else:
+                raise ValueError(f"Unsupported type for key '{key}': {type(value)}")
         return True
+
+    def add(self, collection_dct:Dict[str, Any]) -> None:
+        """Add a key-value pair to the parameter."""
+        diff = set(self.collection_names)
+        diff = set(collection_dct.keys()) - set(self.collection_names)
+        if len(diff) > 0:
+            raise ValueError(f"Collection dictionary has unexpected keys: {diff}")
+        self.collection_dct.update(collection_dct)
 
     def __eq__(self, other:Any) -> bool:
         """Check if two Collection objects are equal."""
@@ -74,10 +89,7 @@ class Collection(object):
 ############################################
 class PCollection(Collection):
     """Collection of Parameters of a distribution."""
-
-    def add(self, collection_dct:Dict[str, Any]) -> None:
-        """Add a key-value pair to the parameter."""
-        self.collection_dct.update(collection_dct)
+    pass
     
 
 ############################################
