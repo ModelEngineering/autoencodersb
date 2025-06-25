@@ -2,10 +2,12 @@
 import iplane.constants as cn  # type: ignore
 from iplane.random import PCollection, DCollection
 
+import inspect
 import pandas as pd  # type: ignore
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import Any, List, Tuple, Optional, Dict, cast
+
 
 
 ################################################
@@ -15,12 +17,20 @@ class PCollectionMixture(PCollection):
     #   collection_names: list of all names of parameters
     #   dct: dictionary of subset name-value pairs
 
-    def __init__(self, **kwargs)->None:
+    def __init__(self,
+                mean_arr:Optional[np.ndarray]=None,
+                covariance_arr:Optional[np.ndarray]=None,
+                weight_arr:Optional[np.ndarray]=None)->None:
         """
         Args:
             parameter_dct (Optional[Dict[str, Any]], optional): parameter name-value pairs.
         """
-        super().__init__(cn.PC_MIXTURE_NAMES, kwargs)
+        dct = dict(
+            mean_arr=mean_arr,
+            covariance_arr=covariance_arr,
+            weight_arr=weight_arr,
+        )
+        super().__init__(cn.PC_MIXTURE_NAMES, dct)
 
     def getAll(self) ->Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
@@ -76,13 +86,18 @@ class PCollectionMixture(PCollection):
         # Check if the dimensions are valid
         self.isValid()
         num_component, num_dimension = self.getComponentAndDimension()
+        if num_dimension == 1:
+            raise ValueError("Cannot select dimensions from a 1D Gaussian mixture.")
         if max(dimensions) >= num_dimension:
             raise ValueError(f"Dimensions must be less than {num_dimension}. Provided dimensions: {dimensions}")
         # Create the new PCollectionMixture with selected dimensions
         indices = np.array(dimensions, dtype=int)
         collection_dct = dict(self.collection_dct)
-        collection_dct[cn.PC_MEAN_ARR] = collection_dct[cn.PC_MEAN_ARR][:, indices] if collection_dct[cn.PC_MEAN_ARR].ndim == 2 else collection_dct[cn.PC_MEAN_ARR][indices]
-        collection_dct[cn.PC_COVARIANCE_ARR] = collection_dct[cn.PC_COVARIANCE_ARR][indices, :] if collection_dct[cn.PC_COVARIANCE_ARR].ndim == 2 else collection_dct[cn.PC_COVARIANCE_ARR][indices]
+        collection_dct[cn.PC_MEAN_ARR] = collection_dct[cn.PC_MEAN_ARR][:, indices]
+        collection_dct[cn.PC_COVARIANCE_ARR] = collection_dct[cn.PC_COVARIANCE_ARR][:, indices, indices]
+        if len(dimensions) == 1:
+            collection_dct[cn.PC_MEAN_ARR] = collection_dct[cn.PC_MEAN_ARR].reshape(num_component)
+            collection_dct[cn.PC_COVARIANCE_ARR] = collection_dct[cn.PC_COVARIANCE_ARR].reshape(num_component)
         if len(dimensions) == 1:
             collection_dct[cn.PC_MEAN_ARR] = collection_dct[cn.PC_MEAN_ARR].reshape(num_component)
             collection_dct[cn.PC_COVARIANCE_ARR] = collection_dct[cn.PC_COVARIANCE_ARR].reshape(num_component)
@@ -93,9 +108,19 @@ class PCollectionMixture(PCollection):
 class DCollectionMixture(DCollection):
     # Distribution collection for mixture of Gaussian distributions.
 
-    def __init__(self, **kwargs)->None:
-        super().__init__(cn.DC_MIXTURE_NAMES, kwargs)
-        self.actual_collection_dct = dict(kwargs)
+    def __init__(self, 
+                variate_arr:Optional[np.ndarray]=None,
+                density_arr:Optional[np.ndarray]=None,
+                dx_arr:Optional[np.ndarray]=None,
+                entropy:Optional[float]=None)->None:
+        dct = dict(
+            variate_arr=variate_arr,
+            density_arr=density_arr,
+            dx_arr=dx_arr,
+            entropy=entropy,
+        )
+        super().__init__(cn.DC_MIXTURE_NAMES, dct)
+        self.actual_collection_dct = dct
     
     def getAll(self) ->Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
         """
@@ -110,7 +135,7 @@ class DCollectionMixture(DCollection):
         return variate_arr, density_arr, dx_arr, entropy
 
     def getComponentAndDimension(self) -> Tuple[int, int]:
-        if super().isAllValid():
+        if not super().isAllValid():
             raise ValueError("Parameter dictionary must contain mean_arr, covariance_arr, and weight_arr.")
         variate_arr, _, dx_arr, _ = self.getAll()
         num_component = len(dx_arr)

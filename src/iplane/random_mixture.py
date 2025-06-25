@@ -103,7 +103,6 @@ class RandomMixture(Random):
             linspaces.append(np.linspace(min_val, max_val, num_sample))
             dx = np.mean(np.diff(linspaces[dim_idx]))
             dxs.append(dx)
-        #variate_arrs = np.meshgrid(*linspaces, indexing='xy')  # Create a grid of variates
         variate_arr = np.array(list(itertools.product(*linspaces)))  # Create a grid of variates
         dx_arr = np.array(dxs)
         # Calculate the densities at each variate value
@@ -126,7 +125,7 @@ class RandomMixture(Random):
         parameter_dct[cn.DC_DENSITY_ARR] = pdf_arr
         parameter_dct[cn.DC_VARIATE_ARR] = variate_arr
         parameter_dct[cn.DC_DX_ARR] =  dx_arr
-        self.dcollection = DCollectionMixture(collection_dct=parameter_dct)
+        self.dcollection = DCollectionMixture(**parameter_dct)
         return self.dcollection
 
     def calculateEntropy(self, pcollection:PCollectionMixture) -> float:

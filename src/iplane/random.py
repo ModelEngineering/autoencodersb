@@ -58,13 +58,13 @@ class Collection(object):
                 raise ValueError(f"Unsupported type for key '{key}': {type(value)}")
         return True
 
-    def add(self, collection_dct:Dict[str, Any]) -> None:
+    def add(self, **kwargs) -> None:
         """Add a key-value pair to the parameter."""
         diff = set(self.collection_names)
-        diff = set(collection_dct.keys()) - set(self.collection_names)
+        diff = set(kwargs.keys()) - set(self.collection_names)
         if len(diff) > 0:
             raise ValueError(f"Collection dictionary has unexpected keys: {diff}")
-        self.collection_dct.update(collection_dct)
+        self.collection_dct.update(kwargs)
 
     def __eq__(self, other:Any) -> bool:
         """Check if two Collection objects are equal."""

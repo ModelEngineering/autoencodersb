@@ -91,12 +91,12 @@ class TestCollection(unittest.TestCase):
             return
         # Add a new key-value pair
         new_dct = {DATE: np.array([1, 2, 3]), ELDERBERRY: np.array([4, 5, 6])}
-        self.collection.add(new_dct)
+        self.collection.add(**new_dct)
         self.assertTrue(self.collection.get(DATE) is not None)
         self.assertTrue(np.array_equal(self.collection.get(DATE), np.array([1, 2, 3])))
         # Add an existing key-value pair
         with self.assertRaises(ValueError):
-            self.collection.add({"missing": APPLE_ARR})
+            self.collection.add(missing=APPLE_ARR)
 
 
 ########################################
