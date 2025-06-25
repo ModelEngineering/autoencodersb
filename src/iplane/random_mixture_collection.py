@@ -43,7 +43,7 @@ class PCollectionMixture(PCollection):
         Returns:
             Tuple[int, int]: Number of components and number of dimensions for the multivariate distribution.
         """
-        if self.isAllValid():
+        if not self.isAllValid():
             raise ValueError("Parameter dictionary must contain mean_arr, covariance_arr, and weight_arr.")
         mean_arr, covariance_arr, weight_arr = self.getAll()
         # Consistent number of components and dimensions
