@@ -28,17 +28,18 @@ class Collection(object):
             self.collection_dct = {}
         else:
             self.collection_dct = dict(collection_dct)
-        if not self.isValid():
-            raise ValueError(f"Collection dictionary must contain all expected keys: {self.collection_names}")
+        self.isValid()
 
     def get(self, name:str) -> Any:
         """Get the value of a parameter by its name."""
         return self.collection_dct.get(name, None)
 
-    def isValid(self) -> bool:
+    def isValid(self):
         """Check if the dictionary contains only valid keys."""
         trues =  [key in self.collection_names for key in self.collection_dct.keys()]
-        return all(trues)
+        if not all(trues):
+            diff = set(self.collection_dct.keys()) - set(self.collection_names)
+            raise ValueError(f"Collection dictionary has unexpected keys: {diff}")
 
     def isAllValid(self) -> bool:
         """Check if the parameter dictionary contains all expected keys and values are non-null."""
@@ -84,7 +85,7 @@ class Collection(object):
                 if not np.isclose(this_value, other_value):
                     return False
         return True
-
+   
 
 ############################################
 class PCollection(Collection):

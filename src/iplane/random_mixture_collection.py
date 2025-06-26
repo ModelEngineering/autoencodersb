@@ -1,21 +1,30 @@
 '''Collection classes used by RandomMixture of Gaussian distribution.'''
+
 import iplane.constants as cn  # type: ignore
 from iplane.random import PCollection, DCollection
 
-import inspect
+import collections
 import pandas as pd  # type: ignore
 import numpy as np
 import matplotlib.pyplot as plt
-from typing import Any, List, Tuple, Optional, Dict, cast
+from typing import Union, List, Tuple, Optional, Dict, cast
 
+
+PCollectionShape = collections.namedtuple('PCollectionShape', ['num_component', 'num_dimension'])
+DCollectionShape = collections.namedtuple('DCollectionShape', ['num_sample', 'num_dimension'])
 
 
 ################################################
 class PCollectionMixture(PCollection):
     # Parameter collection for mixture of Gaussian distributions.
+    #   C: number of components
+    #   D: number of dimensions
     # Instance variables:
     #   collection_names: list of all names of parameters
-    #   dct: dictionary of subset name-value pairs
+    #   collection_dct: dictionary of subset name-value pairs
+    #   mean_arr: C X D, mean of each Gaussian component
+    #   covariance_arr: C X D X D, covariance matrix for each Gaussian component
+    #   weight_arr: C, weight of each Gaussian component, sum(weight_arr) =
 
     def __init__(self,
                 mean_arr:Optional[np.ndarray]=None,
@@ -31,6 +40,7 @@ class PCollectionMixture(PCollection):
             weight_arr=weight_arr,
         )
         super().__init__(cn.PC_MIXTURE_NAMES, dct)
+        self.isValid()
 
     def getAll(self) ->Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
@@ -46,12 +56,13 @@ class PCollectionMixture(PCollection):
         weight_arr = cast(np.ndarray, self.get(cn.PC_WEIGHT_ARR))
         return mean_arr, covariance_arr, weight_arr
     
-    def getComponentAndDimension(self) -> Tuple[int, int]:
+    def getShape(self) -> PCollectionShape:
         """
         Finds the number of components and dimensions for the gaussian distribution.
 
         Returns:
-            Tuple[int, int]: Number of components and number of dimensions for the multivariate distribution.
+            Number of components
+            Number of dimensions
         """
         if not self.isAllValid():
             raise ValueError("Parameter dictionary must contain mean_arr, covariance_arr, and weight_arr.")
@@ -71,7 +82,7 @@ class PCollectionMixture(PCollection):
         if not np.all([mean_arr.shape[0], covariance_arr.shape[0], weight_arr.shape[0]] == [num_component] * 3):
             raise ValueError("Mean, covariance, and weight arrays must have the same number of components.")
         #
-        return num_component, num_dimension
+        return PCollectionShape(num_component=num_component, num_dimension= num_dimension)
     
     def select(self, dimensions:List[int]) -> 'PCollectionMixture':
         """
@@ -84,8 +95,8 @@ class PCollectionMixture(PCollection):
             PCollectionMixture: A new PCollectionMixture object with the selected parameters.
         """
         # Check if the dimensions are valid
-        self.isValid()
-        num_component, num_dimension = self.getComponentAndDimension()
+        shape = self.getShape()
+        num_component, num_dimension = shape.num_component, shape.num_dimension
         if num_dimension == 1:
             raise ValueError("Cannot select dimensions from a 1D Gaussian mixture.")
         if max(dimensions) >= num_dimension:
@@ -96,17 +107,100 @@ class PCollectionMixture(PCollection):
         collection_dct[cn.PC_MEAN_ARR] = collection_dct[cn.PC_MEAN_ARR][:, indices]
         collection_dct[cn.PC_COVARIANCE_ARR] = collection_dct[cn.PC_COVARIANCE_ARR][:, indices, indices]
         if len(dimensions) == 1:
-            collection_dct[cn.PC_MEAN_ARR] = collection_dct[cn.PC_MEAN_ARR].reshape(num_component)
-            collection_dct[cn.PC_COVARIANCE_ARR] = collection_dct[cn.PC_COVARIANCE_ARR].reshape(num_component)
-        if len(dimensions) == 1:
-            collection_dct[cn.PC_MEAN_ARR] = collection_dct[cn.PC_MEAN_ARR].reshape(num_component)
-            collection_dct[cn.PC_COVARIANCE_ARR] = collection_dct[cn.PC_COVARIANCE_ARR].reshape(num_component)
+            collection_dct[cn.PC_MEAN_ARR] = collection_dct[cn.PC_MEAN_ARR].reshape(num_component, 1)
+            collection_dct[cn.PC_COVARIANCE_ARR] = collection_dct[cn.PC_COVARIANCE_ARR].reshape(num_component, 1, 1)
         return PCollectionMixture(**collection_dct)
+    
+    def isValid(self):
+        """
+        Checks if the elements of the collection have the correct dimensions.
+
+        Returns:
+            bool: True if the dictionary is valid, False otherwise.
+        """
+        super().isValid()
+        # Check if all required keys are present
+        mean_arr, covariance_arr, weight_arr = self.getAll()
+        shape = self.getShape()
+        num_component, num_dimension = shape.num_component, shape.num_dimension
+        if (mean_arr is not None) and (mean_arr.shape != (num_component, num_dimension)):
+            raise ValueError(f"Mean array must have shape ({num_component}, {num_dimension}).")
+        if (covariance_arr is not None) and (covariance_arr.shape != (num_component, num_dimension, num_dimension)):
+            raise ValueError(f"Covariance array must have shape ({num_component}, {num_dimension}, {num_dimension}).")
+        if (weight_arr is not None) and (weight_arr.shape != (num_component,)):
+            raise ValueError(f"Weight array must have shape ({num_component},).")
+        
+    def reshape(self, name:str, value:Union[int, float, np.ndarray],
+            has_component:bool=True, has_dimension:bool=False) -> np.ndarray:
+        """
+        Reshapes the element for the collection based on the provided name and dimensions.
+
+        Args:
+            name (str): Name of the parameter to reshape.
+            value (Union[int, float, np.ndarray]): Value to reshape.
+            has_component (bool): Whether the parameter has a multivariate component.
+            has_dimension (bool): Whether the parameter has a multivariable dimension.
+
+        Returns:
+            np.ndarray: Reshaped parameter array.
+        """
+        result = cn.NULL_ARR
+        if name not in self.collection_names:
+            raise ValueError(f"Parameter '{name}' is not in the collection names.")
+        if name == cn.PC_MEAN_ARR:
+            # Mean array is C X D
+            if isinstance(value, (float, int)):
+                result = np.array([[value]])
+            elif value.ndim == 2:
+                result = value
+            elif value.ndim == 1:
+                if has_component:
+                    result = value.reshape(-1, 1)
+                elif has_dimension:
+                    result = value.reshape(1, -1)
+                else:
+                    result = np.reshape(value, (1,1))
+            else:
+                raise ValueError(f"Mean array has invalid shape {value.shape}.")
+        if name == cn.PC_COVARIANCE_ARR:
+            # Covariance array is C X D X D
+            if isinstance(value, (float, int)):
+                result = np.array([[[value]]])
+            elif value.ndim == 1:
+                if has_component:
+                    result = value.reshape(-1, 1, 1)
+                elif has_dimension:
+                    mat = np.zeros((1, value.shape[0], value.shape[0]), dtype=value.dtype)
+                    result = mat
+                else:
+                    result = np.reshape(value, (1,1))
+            else:
+                raise ValueError(f"Covariance array has invalid shape {value.shape}.")
+        if name == cn.PC_WEIGHT_ARR:
+            # Weight array is C
+            if isinstance(value, (float, int)):
+                result = np.array([value])
+            elif value.ndim == 1:
+                result = value
+            else:
+                raise ValueError(f"Weight array has invalid shape {value.shape}.")
+        #
+        if result is cn.NULL_ARR:
+            raise ValueError(f"Parameter '{name}' has no valid shape.")
+        return result
+
 
 
 ################################################
 class DCollectionMixture(DCollection):
     # Distribution collection for mixture of Gaussian distributions.
+    #   C: number of components
+    #   N: number of samples
+    #   D: number of dimensions
+    #   variate_arr: N X D
+    #   density_arr: N
+    #   dx_arr: D
+    #   entropy: float
 
     def __init__(self, 
                 variate_arr:Optional[np.ndarray]=None,
@@ -121,6 +215,7 @@ class DCollectionMixture(DCollection):
         )
         super().__init__(cn.DC_MIXTURE_NAMES, dct)
         self.actual_collection_dct = dct
+        self.isValid()
     
     def getAll(self) ->Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
         """
@@ -134,13 +229,35 @@ class DCollectionMixture(DCollection):
                 cast(float, self.get(cn.DC_ENTROPY))
         return variate_arr, density_arr, dx_arr, entropy
 
-    def getComponentAndDimension(self) -> Tuple[int, int]:
-        if not super().isAllValid():
-            raise ValueError("Parameter dictionary must contain mean_arr, covariance_arr, and weight_arr.")
-        variate_arr, _, dx_arr, _ = self.getAll()
-        num_component = len(dx_arr)
-        if variate_arr.ndim == 1:
-            num_dimension = 1
-        else:
-            num_dimension = variate_arr.shape[1]
-        return num_component, num_dimension
+    def getShape(self) -> DCollectionShape:
+        """
+        Returns:
+            num_sample (int): Number of samples in the variate array.
+            num_dimension (int): Number of dimensions in the variate array.
+        """
+        variate_arr = self.get(cn.DC_VARIATE_ARR)
+        if variate_arr is None:
+            raise ValueError("Variate array must not be None.")
+        return DCollectionShape(num_sample=variate_arr.shape[0], num_dimension=variate_arr.shape[1])
+    
+    def isValid(self):
+        """
+        Checks if the elements of the collection have the correct dimensions.
+
+        Returns:
+            bool: True if the dictionary is valid, False otherwise.
+        """
+        super().isValid()
+        # Check if all required keys are present
+        variate_arr, density_arr, dx_arr, entropy = self.getAll()
+        collection_shape = self.getShape()
+        num_sample = collection_shape.num_sample
+        num_dimension = collection_shape.num_dimension
+        if (variate_arr is not None) and (variate_arr.shape != (num_sample, num_dimension)):
+            raise ValueError(f"Variate array must have shape ({num_sample}, {num_dimension}).")
+        if (density_arr is not None) and (density_arr.shape != (num_sample,)):
+            raise ValueError(f"Density array must have shape ({num_sample},).")
+        if (dx_arr is not None) and (dx_arr.shape != (num_dimension,)):
+            raise ValueError(f"dx array must have shape ({num_dimension},).")
+        if (entropy is not None) and (not isinstance(entropy, (int, float))):
+            raise ValueError("Entropy must be a float value.")

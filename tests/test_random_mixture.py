@@ -127,8 +127,8 @@ class TestRandomMixture(unittest.TestCase):
     def testMakeDistribution1Component1Dimension(self):
         if IGNORE_TESTS:
             return
-        MEAN_ARR = np.reshape(np.array([5]), (1, -1))
-        COVARIANCE_ARR = np.reshape(np.array([0.5]), (1, -1))
+        MEAN_ARR = np.array([5])
+        COVARIANCE_ARR = np.array([0.5])
         pcollection = PCollectionMixture(
             mean_arr=MEAN_ARR,
             covariance_arr=COVARIANCE_ARR,
@@ -165,19 +165,17 @@ class TestRandomMixture(unittest.TestCase):
             weight_arr=weight_arr
         )
         dcollection = self.random.makeDCollection(pcollection)
-        variate_arr, density_arr, dx_arr, entropy = dcollection.getAll()
+        variate_arr, density_arr, _, entropy = dcollection.getAll()
         return variate_arr, density_arr, entropy, pcollection
     
-    def testMakeDensity2Component1Dimension(self):
+    def testMakeDensityNComponent1Dimension(self):
         # Evaluates calculations for 1-dimensional mixture and multiple components to the mixture.
-        if IGNORE_TESTS:
-            return
+        #if IGNORE_TESTS:
+        #    return
         def test(num_component:int=2):
             mean_arr = np.array([(20*n)*0.5 for n in range(num_component)])
-            mean_arr = np.reshape(mean_arr, (-1, 1))
             # Independent dimensions
             covariance_arr = np.array([(n+1)*0.1 for n in range(num_component)])
-            covariance_arr = np.reshape(covariance_arr, (-1, 1))
             weight_arr = np.repeat(1/num_component, num_component)
             variate_arr, density_arr, entropy, pcollection = self.makeDistribution(mean_arr=mean_arr,
                     covariance_arr=covariance_arr, weight_arr=weight_arr)
