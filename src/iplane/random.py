@@ -41,23 +41,22 @@ class Collection(object):
             diff = set(self.collection_dct.keys()) - set(self.collection_names)
             raise ValueError(f"Collection dictionary has unexpected keys: {diff}")
 
-    def isAllValid(self) -> bool:
+    def isAllValid(self)->None:
         """Check if the parameter dictionary contains all expected keys and values are non-null."""
         for key in self.collection_names:
             if not key in self.collection_dct:
-                return False
+                raise ValueError(f"Collection dictionary is missing key: {key}")
             if self.collection_dct[key] is None:
-                return False
+                raise ValueError(f"Collection dictionary has None value for key: {key}")
             value = self.collection_dct[key]
             if isinstance(value, np.ndarray):   
                 if value.size == 0 or np.isnan(value).any():
-                    return False
+                    raise ValueError(f"Collection dictionary has empty or NaN value for key: {key}")
             elif isinstance(value, (int, float)):
                 if np.isnan(value):
-                    return False
+                    raise ValueError(f"Collection dictionary has NaN value for key: {key}")
             else:
-                raise ValueError(f"Unsupported type for key '{key}': {type(value)}")
-        return True
+                raise ValueError(f"Collection dictionary has unexpected type for key: {key}, value: {value}")
 
     def add(self, **kwargs) -> None:
         """Add a key-value pair to the parameter."""
@@ -72,7 +71,10 @@ class Collection(object):
         if not str(type(self)) == str(type(other)):
             raise RuntimeError(f"Cannot compare {str(type(self))} with {str(type(other))}.")
         # Check if all expected parameters are present and equal
-        if not self.isAllValid() or not other.isAllValid():
+        try:
+            self.isAllValid()
+            other.isAllValid()
+        except ValueError:
             return False
         # Compare the values
         for key in self.collection_names:

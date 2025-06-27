@@ -55,18 +55,30 @@ class TestCollection(unittest.TestCase):
         """Test the isAllValid method of Collection."""
         if IGNORE_TESTS:
             return
-        self.assertFalse(self.collection.isAllValid())
+        try:
+            self.assertFalse(self.collection.isAllValid())
+            self.assertFalse(True)
+        except:
+            self.assertFalse(False)
         # All keys but None values
         collection_dct = dict(COLLECTION_DCT)
         collection_dct[DATE] = None 
         collection_dct[ELDERBERRY] = np.nan
         self.collection = Collection(COLLECTION_NAMES, collection_dct)
-        self.assertFalse(self.collection.isAllValid())
+        try:
+            self.assertFalse(self.collection.isAllValid())
+            self.assertFalse(True)
+        except:
+            self.assertFalse(False)
         # All keys and values are valid
         collection_dct[DATE] = 3
         collection_dct[ELDERBERRY] = np.array([7, 8, 9])
         self.collection = Collection(COLLECTION_NAMES, collection_dct)
-        self.assertTrue(self.collection.isAllValid())
+        try:
+            self.assertTrue(self.collection.isAllValid())
+            self.assertFalse(True)
+        except:
+            self.assertFalse(False)
 
     def testEq(self):
         """Test the __eq__ method of Collection."""

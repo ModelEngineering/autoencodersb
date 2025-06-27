@@ -42,6 +42,16 @@ class PCollectionMixture(PCollection):
         super().__init__(cn.PC_MIXTURE_NAMES, dct)
         self.isValid()
 
+    def __str__(self) -> str:
+        """
+        Returns a string representation of the PCollectionMixture object.
+        """
+        mean_arr, covariance_arr, weight_arr = self.getAll()
+        return ("mean_arr, covariance_arr, weight_arr"
+                f"\nPCollectionMixture(mean_arr={mean_arr}"
+                f"\ncovariance_arr={covariance_arr}, "
+                f"\nweight_arr={weight_arr})")
+
     def getAll(self) ->Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Returns all parameters as a tuple of numpy arrays.
@@ -49,8 +59,6 @@ class PCollectionMixture(PCollection):
         Returns:
             Tuple[np.ndarray, np.ndarray, np.ndarray]: Tuple containing mean_arr, covariance_arr, and weight_arr.
         """
-        if not self.isAllValid():
-            raise ValueError("Parameter dictionary must contain mean_arr, covariance_arr, and weight_arr.")
         mean_arr = cast(np.ndarray, self.get(cn.PC_MEAN_ARR))
         covariance_arr = cast(np.ndarray, self.get(cn.PC_COVARIANCE_ARR))
         weight_arr = cast(np.ndarray, self.get(cn.PC_WEIGHT_ARR))
@@ -64,8 +72,6 @@ class PCollectionMixture(PCollection):
             Number of components
             Number of dimensions
         """
-        if not self.isAllValid():
-            raise ValueError("Parameter dictionary must contain mean_arr, covariance_arr, and weight_arr.")
         mean_arr, covariance_arr, weight_arr = self.getAll()
         # Consistent number of components and dimensions
         if weight_arr.ndim != 1:
@@ -111,14 +117,14 @@ class PCollectionMixture(PCollection):
             collection_dct[cn.PC_COVARIANCE_ARR] = collection_dct[cn.PC_COVARIANCE_ARR].reshape(num_component, 1, 1)
         return PCollectionMixture(**collection_dct)
     
-    def isValid(self):
+    def isAllValid(self):
         """
         Checks if the elements of the collection have the correct dimensions.
 
         Returns:
             bool: True if the dictionary is valid, False otherwise.
         """
-        super().isValid()
+        super().isAllValid()
         # Check if all required keys are present
         mean_arr, covariance_arr, weight_arr = self.getAll()
         shape = self.getShape()
@@ -215,15 +221,23 @@ class DCollectionMixture(DCollection):
         )
         super().__init__(cn.DC_MIXTURE_NAMES, dct)
         self.actual_collection_dct = dct
-        self.isValid()
+        self.isAllValid()
+
+    def __str__(self) -> str:
+        """
+        Returns a string representation of the DCollectionMixture object.
+        """
+        variate_arr, density_arr, dx_arr, entropy = self.getAll()
+        return (f"DCollectionMixture(variate_arr={variate_arr}"
+                f"\ndensity_arr={density_arr}"
+                f"\ndx_arr={dx_arr}"
+                f"\nentropy={entropy})")
     
     def getAll(self) ->Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
         """
         Returns all parameters as a tuple of numpy arrays.
                     variate_arr: np.ndarray, density_arr: np.ndarray, dx_arr: np.ndarray, entropy: float
         """
-        if not self.isAllValid():
-            raise ValueError("Parameter dictionary must contain mean_arr, covariance_arr, and weight_arr.")
         variate_arr, density_arr, dx_arr, entropy = cast(np.ndarray, self.get(cn.DC_VARIATE_ARR)),   \
                 cast(np.ndarray, self.get(cn.DC_DENSITY_ARR)), cast(np.ndarray, self.get(cn.DC_DX_ARR)),  \
                 cast(float, self.get(cn.DC_ENTROPY))
@@ -240,14 +254,14 @@ class DCollectionMixture(DCollection):
             raise ValueError("Variate array must not be None.")
         return DCollectionShape(num_sample=variate_arr.shape[0], num_dimension=variate_arr.shape[1])
     
-    def isValid(self):
+    def isAllValid(self):
         """
         Checks if the elements of the collection have the correct dimensions.
 
         Returns:
             bool: True if the dictionary is valid, False otherwise.
         """
-        super().isValid()
+        super().isAllValid()
         # Check if all required keys are present
         variate_arr, density_arr, dx_arr, entropy = self.getAll()
         collection_shape = self.getShape()

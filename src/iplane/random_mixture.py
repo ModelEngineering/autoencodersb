@@ -56,17 +56,16 @@ class RandomMixture(Random):
         mean_arr, covariance_arr, weight_arr = pcollection.getAll()
         num_component = parameter.getShape().num_component
         # Calculate samples based on the Guassian mixure parameters.
-        sample_arr = cast(np.ndarray, int(num_sample * weight_arr))
+        sample_arr = np.array([int(w*num_sample) for w in weight_arr])
         arrs = []
-        if (mean_arr.ndim == 1) or (np.shape(mean_arr)[1] == 1):
-            std_arr = np.sqrt(covariance_arr)
-            for idx in range(num_component):
-                result_arr = np.random.normal(loc=mean_arr[idx], scale=std_arr[idx], size=sample_arr[idx])
-                arrs.append(result_arr)
-        else:
-            for idx in range(num_component):
+        #if (mean_arr.ndim == 1) or (np.shape(mean_arr)[1] == 1):
+        for i_component in range(num_component):
+            result_arr = np.random.multivariate_normal(mean_arr[i_component, :], covariance_arr[i_component, :, :],
+                    sample_arr[i_component])
+            arrs.append(result_arr)
+            """ for idx in range(num_component):
                 result_arr = np.random.multivariate_normal(mean_arr[idx, :], covariance_arr[idx, :, :],  sample_arr[idx])
-                arrs.append(result_arr)
+                arrs.append(result_arr) """
         merged_arr = np.concatenate(arrs)
         merged_arr = np.random.permutation(merged_arr)
         return merged_arr
@@ -89,47 +88,45 @@ class RandomMixture(Random):
         # Calculate the number of samples for each dimension
         num_sample = int(self.max_num_sample**(1/num_dimension))
         if num_sample < 8:
-            raise ValueError("Number of samples per dimension must be at least 8. Increase max_num_sample.")
+            msg = "Number of samples per dimension must be at least 8."
+            msg += f"\n  Increase max_num_sample so that 8**num_dimesion <= max_num_sample,"
+            msg += f"\n  Currently:"
+            msg += f"\n    num_sample={num_sample}"
+            msg += f"\n    max_num_sample={self.max_num_sample}"
+            msg += f"\n    num_dimension={num_dimension})."
+            raise ValueError(msg)
         STD_MAX = 4
         # Caclulate the coordinates for each dimension
         linspaces:list = []
         dxs = []
-        for dim_idx in range(num_dimension):
-            if num_dimension == 1:
-                std_arr = np.sqrt(covariance_arr)
-                min_val = min(mean_arr[dim_idx] - STD_MAX * std_arr)
-                max_val = max(mean_arr[dim_idx] + STD_MAX * std_arr)
-            else:
-                std_arr = np.sqrt(covariance_arr[:, dim_idx, dim_idx])
-                min_val = min(mean_arr[:, dim_idx] - STD_MAX * std_arr)
-                max_val = max(mean_arr[:, dim_idx] + STD_MAX * std_arr)
-            std_arr = std_arr.flatten()
-            linspaces.append(np.linspace(min_val, max_val, num_sample))
-            dx = np.mean(np.diff(linspaces[dim_idx]))
+        for i_dim in range(num_dimension):
+            std = np.sqrt(covariance_arr[:, i_dim, i_dim])  # Get the standard deviation for each component in the current dimension
+            min_val = min(mean_arr[:, i_dim]) - STD_MAX * std
+            max_val = max(mean_arr[:, i_dim]) + STD_MAX * std
+            std = std.flatten()
+            linspace_arr = np.linspace(min_val, max_val, num=num_sample).flatten()
+            linspaces.append(linspace_arr)
+            dx = np.mean(np.diff(linspace_arr))  # Calculate the average change in x values
             dxs.append(dx)
         variate_arr = np.array(list(itertools.product(*linspaces)))  # Create a grid of variates
+        variate_arr = variate_arr.reshape(-1, num_dimension)  # Reshape to (num_sample, num_dimension)
         dx_arr = np.array(dxs)
         # Calculate the densities at each variate value
-        pdfs:list = []
+        densities:list = []
         num_sample = variate_arr.shape[0]
         for i_component in range(num_component):
             weight = weight_arr[i_component]
-            if num_dimension == 1:
-                covariance = np.array([covariance_arr[i_component]])
-                mean = np.array([mean_arr[i_component]])
-            else:
-                covariance = covariance_arr[i_component, :, :]
-                mean = mean_arr[i_component, :]
+            covariance = covariance_arr[i_component, :, :]
+            mean = mean_arr[i_component, :]
             mvn = multivariate_normal(mean=mean, cov=covariance)   # type: ignore
             result_arr = mvn.pdf(variate_arr)
-            pdfs.append(weight*result_arr)
-        import pdb; pdb.set_trace()
-        pdf_arr = np.sum(pdfs, axis=0)  # Sum the PDFs of all components
+            densities.append(weight*result_arr)
+        density_arr = np.sum(densities, axis=0)  # Sum the PDFs of all components
         # Calculate entropy
-        Hx = -np.sum(pdf_arr * np.log2(pdf_arr + 1e-10)) * np.prod(dxs)  # Add small value to avoid log(0)
+        Hx = -np.sum(density_arr * np.log2(density_arr + 1e-10)) * np.prod(dxs)  # Add small value to avoid log(0)
         dcollection_dct:dict = {}
         dcollection_dct[cn.DC_ENTROPY] = Hx
-        dcollection_dct[cn.DC_DENSITY_ARR] = pdf_arr
+        dcollection_dct[cn.DC_DENSITY_ARR] = density_arr
         dcollection_dct[cn.DC_VARIATE_ARR] = variate_arr
         dcollection_dct[cn.DC_DX_ARR] =  dx_arr
         self.dcollection = DCollectionMixture(**dcollection_dct)
@@ -146,27 +143,29 @@ class RandomMixture(Random):
         Returns:
             float: Entropy of the Gaussian distribution.
         """
+        num_dimension = pcollection.getShape().num_dimension
+        constant_term = (2 * np.pi * np.e)**num_dimension
         ##
-        def calc(cov):
-            return 0.5 * np.log2(((2 * np.pi * np.e)**num_dimension) * cov)
-        ##
-        shape = pcollection.getShape()
-        num_component, num_dimension = shape.num_component, shape.num_dimension
-        covariance_arr = pcollection.get(cn.PC_COVARIANCE_ARR)
-        if covariance_arr is None:
-            raise ValueError("Covariance array must be provided.")
-        if num_component > 1:
-            if num_dimension == 1 and len(covariance_arr> 1):
-                warnings.warn("Multiple components detected in a 1D Gaussian mixture. Using sum of component entropy.")
-            result = 0.0
-            for cov in covariance_arr:
-                result += calc(cov)
-        else:
-            det = np.linalg.det(covariance_arr)
+        def calcHx(cov):
+            # Calculates entropy for a single Multivariate Gaussian distribution.
+            det = np.linalg.det(cov)
             if np.isclose(det, 0):
                 raise ValueError("Covariance matrix must be non-singular.")
-            result = calc(det)
-        import pdb; pdb.set_trace()
+            return 0.5 * np.log2(constant_term * det)
+        ##
+        covariance_arr = pcollection.get(cn.PC_COVARIANCE_ARR)
+        weight_arr = pcollection.get(cn.PC_WEIGHT_ARR)
+        if covariance_arr is None:
+            raise ValueError("Covariance array must be provided.")
+        if len(covariance_arr) > 1:
+            warnings.warn("Multiple components detected in a 1D Gaussian mixture. Using sum of component entropy.")
+        result = 0.0
+        for cov, weight in zip(covariance_arr, weight_arr):
+            result += weight*calcHx(cov)
+        offset = -np.sum([w*np.log2(w) for w in weight_arr])  # log2 of the weights
+        result += offset  # Add the log2 of the weights to the entropy
+        if isinstance(result, np.ndarray):
+            result = result.item()
         return result
 
     def estimatePCollection(self, sample_arr:np.ndarray)->PCollectionMixture:
@@ -191,6 +190,6 @@ class RandomMixture(Random):
         dct = {
             cn.PC_MEAN_ARR: self.gmm.means_, 
             cn.PC_COVARIANCE_ARR: self.gmm.covariances_,
-            cn.PC_WEIGHT_ARR: np.array(self.gmm.weights_)}
+            cn.PC_WEIGHT_ARR: np.array(self.gmm.weights_, dtype=np.float64),}
         self.pcollection = PCollectionMixture(**dct)
         return self.pcollection
