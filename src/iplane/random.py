@@ -113,7 +113,7 @@ class Random(object):
         """Estimates the Parameter instance for from the data array."""
         raise NotImplementedError("This method should be overridden by subclasses.")
     
-    def makeDCollection(self, pcollection:Any) -> DCollection:
+    def makeDCollection(self, pcollection:Any, variate_arr:Optional[np.ndarray]=None) -> DCollection:
         """Create a Distribution object from the ParameterCollection."""
         raise NotImplementedError("This method should be overridden by subclasses.")
 

@@ -21,16 +21,19 @@ class RandomMixture(Random):
             dcollection:Optional[DCollectionMixture]=None,
             num_component:int = 2,
             random_state:int = 42,
-            max_num_sample:int = cn.MAX_NUM_SAMPLE,
+            total_num_sample:int = cn.TOTAL_NUM_SAMPLE,
             ):
         """
         Initializes the MixtureEntropy object.
         Args:
+            pcollection (PCollectionMixture): collection of parameters for the Gaussian mixture model.
+            dcollection (DCollectionMixture): collection of distribution properties.
+            total_num_sample (int): total number of samples to generate.
             num_component (int): number of components in the mixture model.
             random_state (int): random state for reproducibility.
         """
         super().__init__(pcollection, dcollection)
-        self.max_num_sample = max_num_sample
+        self.total_num_sample = total_num_sample
         self.num_component = num_component
         self.random_state = random_state
         # Use k-means clustering to initialize the Gaussian Mixture Model
@@ -70,32 +73,40 @@ class RandomMixture(Random):
         merged_arr = np.random.permutation(merged_arr)
         return merged_arr
     
-    def makeDCollection(self, pcollection:PCollectionMixture) -> DCollectionMixture:
+    def makeDCollection(self, pcollection:PCollectionMixture,
+            variate_arr:Optional[np.ndarray]=None) -> DCollectionMixture:
         """
         Calculates the probability density function (PDF) for a multi-dimensional Gaussian mixture model
         and calculates its differential entropy.
 
         Args:
-            parameter (PCollectionMixture): The parameter collection for the distribution.
+            pcollection (PCollectionMixture): The collection of parameters for the Gaussian mixture model.
+            variate_arr (Optional[np.ndarray]): Optional array of variates to evaluate the PDF.
 
         Returns:
             DistributionCollectionMGaussian: The distribution object containing the variate array, PDF array, dx array, and entropy.
         """
+        STD_MAX = 4
         # Checks
         shape = pcollection.getShape()
         num_component, num_dimension = shape.num_component, shape.num_dimension
-        mean_arr, covariance_arr, weight_arr = pcollection.getAll()
+        if variate_arr is not None:
+            if variate_arr.ndim != 2 or variate_arr.shape[1] != num_dimension:
+                raise ValueError(f"variate_arr must be a 2D array with shape (num_sample, {num_dimension}).")
+            total_num_sample = variate_arr.shape[0]
+        else:
+            total_num_sample = self.total_num_sample
         # Calculate the number of samples for each dimension
-        num_sample = int(self.max_num_sample**(1/num_dimension))
+        num_sample = int(total_num_sample**(1/num_dimension))
         if num_sample < 8:
             msg = "Number of samples per dimension must be at least 8."
             msg += f"\n  Increase max_num_sample so that 8**num_dimesion <= max_num_sample,"
             msg += f"\n  Currently:"
             msg += f"\n    num_sample={num_sample}"
-            msg += f"\n    max_num_sample={self.max_num_sample}"
+            msg += f"\n    max_num_sample={self.total_num_sample}"
             msg += f"\n    num_dimension={num_dimension})."
             raise ValueError(msg)
-        STD_MAX = 4
+        mean_arr, covariance_arr, weight_arr = pcollection.getAll()
         # Caclulate the coordinates for each dimension
         linspaces:list = []
         dxs = []

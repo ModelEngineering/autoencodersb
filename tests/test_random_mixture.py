@@ -15,7 +15,7 @@ NUM_SAMPLE = 1000
 class TestRandomMixture(unittest.TestCase):
 
     def setUp(self):
-        self.random = RandomMixture(max_num_sample=int(1e6), random_state=42)
+        self.random = RandomMixture(total_num_sample=int(1e6), random_state=42)
 
     def makeMixture(self,
             num_component:int=2,

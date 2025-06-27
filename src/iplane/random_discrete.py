@@ -20,8 +20,9 @@ class PCollectionDiscrete(PCollection):
         if not isinstance(other, PCollectionDiscrete):
             return False
         # Check if all expected parameters are present and equal
-        if not self.isAllValid() or not other.isAllValid():
-            return False
+        self.isAllValid()
+        other.isAllValid()
+        #
         for key in cn.PC_DISCRETE_NAMES:
             this_value = self.get(key)
             other_value = other.get(key)
@@ -61,18 +62,26 @@ class RandomDiscrete(Random):
         dct = {cn.PC_CATEGORY_ARR: category_arr, cn.PC_PROBABILITY_ARR: probability_arr }
         return PCollectionDiscrete(dct)
     
-    def makeDCollection(self, pcollection:PCollectionDiscrete) -> DCollectionDiscrete:
+    def makeDCollection(self, pcollection:PCollectionDiscrete,
+            variate_arr:Optional[np.ndarray]=None) -> DCollectionDiscrete:
         """Calculates entropy for the discrete random variable.
 
         Args:
             pcollection (PCollectionDiscrete)
-            max_num_sample (int): Maximum number of samples to consider.
+                PCollectionDiscrete with the parameters of the distribution.
+            variate_arr (Optional[np.ndarray], optional): Not used for discrete random variables. Defaults to None.            
 
         Returns:
             DCollectionDiscrete:
         """
+        variate_arr = pcollection.get(cn.PC_CATEGORY_ARR)
+        probability_arr = pcollection.get(cn.PC_PROBABILITY_ARR)
         entropy = self.calculateEntropy(pcollection)
-        self.dcollection = DCollectionDiscrete({cn.DC_ENTROPY: entropy})
+        self.dcollection = DCollectionDiscrete({
+            cn.DC_ENTROPY: entropy,
+            cn.DC_VARIATE_ARR: variate_arr,
+            cn.DC_PROBABILITY_ARR: probability_arr}
+            )
         return self.dcollection
 
     def plot(self, dcollection:Optional[DCollectionDiscrete]=None)->None:
