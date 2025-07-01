@@ -10,29 +10,10 @@ from typing import Tuple, Any, Optional, Dict, List, cast
 
 ################################################
 class PCollectionDiscrete(PCollection):
-    # Parameter collection for mixture of Gaussian distributions.
+    # Parameter collection for discrete random variables.
 
-    def __init__(self, parameter_dct:Optional[Dict[str, Any]]=None)->None:
-        super().__init__(cn.PC_DISCRETE_NAMES, parameter_dct)
-
-    def __eq__(self, other:Any) -> bool:
-        """Check if two ParameterMGaussian objects are equal."""
-        if not isinstance(other, PCollectionDiscrete):
-            return False
-        # Check if all expected parameters are present and equal
-        self.isAllValid()
-        other.isAllValid()
-        #
-        for key in cn.PC_DISCRETE_NAMES:
-            this_value = self.get(key)
-            other_value = other.get(key)
-            if isinstance(this_value, np.ndarray):
-                if not np.allclose(this_value.flatten(), other_value.flatten()):
-                    return False
-            else:
-                if not np.isclose(this_value, other_value):
-                    return False
-        return True
+    def __init__(self, collection_dct:Optional[Dict[str, Any]]=None)->None:
+        super().__init__(cn.PC_DISCRETE_NAMES, collection_dct)
 
 
 ################################################
@@ -62,8 +43,8 @@ class RandomDiscrete(Random):
         dct = {cn.PC_CATEGORY_ARR: category_arr, cn.PC_PROBABILITY_ARR: probability_arr }
         return PCollectionDiscrete(dct)
     
-    def makeDCollection(self, pcollection:PCollectionDiscrete,
-            variate_arr:Optional[np.ndarray]=None) -> DCollectionDiscrete:
+    def makeDCollection(self, variate_arr:Optional[np.ndarray]=None,
+                pcollection:Optional[PCollectionDiscrete]=None) -> DCollectionDiscrete:
         """Calculates entropy for the discrete random variable.
 
         Args:
@@ -74,6 +55,7 @@ class RandomDiscrete(Random):
         Returns:
             DCollectionDiscrete:
         """
+        pcollection = cast(PCollectionDiscrete, self.setPCollection(pcollection))
         variate_arr = pcollection.get(cn.PC_CATEGORY_ARR)
         probability_arr = pcollection.get(cn.PC_PROBABILITY_ARR)
         entropy = self.calculateEntropy(pcollection)
@@ -106,7 +88,7 @@ class RandomDiscrete(Random):
         plt.tight_layout()
         plt.show()
 
-    def calculateEntropy(self, pcollection:PCollectionDiscrete)->float:
+    def calculateEntropy(self, collection:PCollectionDiscrete)->float:
         """Analytical calculation of entropy for a categorical array.
 
         Args:
@@ -115,5 +97,5 @@ class RandomDiscrete(Random):
         Returns:
             CategoricalEntropy: An instance with calculated entropy and categories.
         """
-        probability_arr = pcollection.get(cn.PC_PROBABILITY_ARR)
+        probability_arr = collection.get(cn.PC_PROBABILITY_ARR)
         return -np.sum(probability_arr * np.log2(probability_arr + 1e-10))

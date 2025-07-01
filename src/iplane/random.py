@@ -8,7 +8,7 @@ a Parameter object appropriate for these methods. Generated distributions are st
 import iplane.constants as cn
 
 import numpy as np
-from typing import Any, Optional, Dict, List
+from typing import Any, Optional, Dict, List, Union, cast
 
 ENTROPY = 'entropy'
 
@@ -113,7 +113,12 @@ class Random(object):
         """Estimates the Parameter instance for from the data array."""
         raise NotImplementedError("This method should be overridden by subclasses.")
     
-    def makeDCollection(self, pcollection:Any, variate_arr:Optional[np.ndarray]=None) -> DCollection:
+    def predict(self, variate_arr:np.ndarray, pcollection:Optional[Any]=None) -> float:
+        """Predict the probability of a single variate_arr (multiple dimensions)."""
+        """Uses saved PCollection if this is not specified."""
+        raise NotImplementedError("This method should be overridden by subclasses.")
+    
+    def makeDCollection(self, variate_arr:Optional[np.ndarray]=None, pcollection:Optional[Any]=None)  -> DCollection:
         """Create a Distribution object from the ParameterCollection."""
         raise NotImplementedError("This method should be overridden by subclasses.")
 
@@ -121,7 +126,7 @@ class Random(object):
         """Generate a random sample from the self.actual_parameter."""
         raise NotImplementedError("This method should be overridden by subclasses.")
     
-    def calculateEntropy(self, pcollection:Any) -> float:
+    def calculateEntropy(self, collection:Any) -> float:
         """Analytic calculation of the entropy of the distribution based on the parameters of the distribution."""
         raise NotImplementedError("This method should be overridden by subclasses.")
 
@@ -129,5 +134,21 @@ class Random(object):
         """Evaluate the calculation using a round trip of estimation and generation."""
         sample_arr = self.generateSample(pcollection, num_samples)
         estimated_pcollection = self.estimatePCollection(sample_arr)
-        dcollection = self.makeDCollection(estimated_pcollection)
+        dcollection = self.makeDCollection(pcollection=estimated_pcollection)
         return dcollection == self.makeDCollection(pcollection)
+    
+    def setPCollection(self, pcollection:Union[PCollection, None]) -> PCollection:
+        """Set the PCollection for this Random instance."""
+        if pcollection is None:
+            if self.pcollection is None:
+                raise RuntimeError("PCollection has not been set.")
+            pcollection = self.pcollection
+        return cast(PCollection, pcollection)
+    
+    def setDCollection(self, dcollection:Union[DCollection, None]) -> DCollection:
+        """Set the DCollection for this Random instance."""
+        if dcollection is None:
+            if self.dcollection is None:
+                raise RuntimeError("DCollection has not been set.")
+            dcollection = self.dcollection
+        return cast(DCollection, dcollection)

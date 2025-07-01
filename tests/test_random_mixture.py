@@ -156,7 +156,7 @@ class TestRandomMixture(unittest.TestCase):
             covariance_arr=covariance_arr,
             weight_arr=weight_arr
         )
-        dcollection = self.random.makeDCollection(pcollection)
+        dcollection = self.random.makeDCollection(pcollection=pcollection)
         variate_arr, density_arr, _, entropy = dcollection.getAll()
         return variate_arr, density_arr, entropy, pcollection
     

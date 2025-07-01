@@ -73,8 +73,8 @@ class RandomMixture(Random):
         merged_arr = np.random.permutation(merged_arr)
         return merged_arr
     
-    def makeDCollection(self, pcollection:PCollectionMixture,
-            variate_arr:Optional[np.ndarray]=None) -> DCollectionMixture:
+    def makeDCollection(self, variate_arr:Optional[np.ndarray]=None,
+            pcollection:Optional[PCollection]=None) -> DCollectionMixture:
         """
         Calculates the probability density function (PDF) for a multi-dimensional Gaussian mixture model
         and calculates its differential entropy.
@@ -88,6 +88,8 @@ class RandomMixture(Random):
         """
         STD_MAX = 4
         # Checks
+        # Error checking
+        pcollection = cast(PCollectionMixture, self.setPCollection(pcollection))
         shape = pcollection.getShape()
         num_component, num_dimension = shape.num_component, shape.num_dimension
         if variate_arr is not None:
@@ -142,8 +144,40 @@ class RandomMixture(Random):
         dcollection_dct[cn.DC_DX_ARR] =  dx_arr
         self.dcollection = DCollectionMixture(**dcollection_dct)
         return self.dcollection
+    
+    def predict(self, variate_arr:np.ndarray, collection:Optional[PCollectionMixture]=None)-> float:
+        """
+        Predicts the probability density function (PDF) for a given array of variates using the Gaussian Mixture Model.
 
-    def calculateEntropy(self, pcollection:PCollectionMixture) -> float:
+        Args:
+            variate_arr (np.ndarray): Array of variates to evaluate the PDF.
+
+        Returns:
+            np.ndarray: Array of predicted PDF values for each variate.
+        """
+        # Error checking
+        collection = cast(PCollectionMixture, self.setPCollection(collection))
+        if collection is None:
+            if self.pcollection is None:
+                raise ValueError("PCollection has not been estimated yet.")
+            collection = cast(PCollectionMixture, self.pcollection)
+        # Initializations
+        collection = cast(PCollectionMixture, collection)
+        mean_arr, covariance_arr, weight_arr = collection.getAll()
+        num_component = collection.getShape().num_component
+        # Calculation
+        densities:list = []
+        for i_component in range(num_component):
+            weight = weight_arr[i_component]
+            covariance = covariance_arr[i_component, :, :]
+            mean = mean_arr[i_component, :]
+            mvn = multivariate_normal(mean=mean, cov=covariance)   # type: ignore
+            density = mvn.pdf(variate_arr)
+            densities.append(weight*density)
+        density_arr = np.sum(densities, axis=0)  # Sum the PDFs of all components
+        return density_arr
+
+    def calculateEntropy(self, collection:PCollectionMixture) -> float:
         """
         Calculates the entropy of a multivariate Gaussian distribution. If there are multiple components,
         it estimates the first.
@@ -154,7 +188,7 @@ class RandomMixture(Random):
         Returns:
             float: Entropy of the Gaussian distribution.
         """
-        num_dimension = pcollection.getShape().num_dimension
+        num_dimension = collection.getShape().num_dimension
         constant_term = (2 * np.pi * np.e)**num_dimension
         ##
         def calcHx(cov):
@@ -164,8 +198,8 @@ class RandomMixture(Random):
                 raise ValueError("Covariance matrix must be non-singular.")
             return 0.5 * np.log2(constant_term * det)
         ##
-        covariance_arr = pcollection.get(cn.PC_COVARIANCE_ARR)
-        weight_arr = pcollection.get(cn.PC_WEIGHT_ARR)
+        covariance_arr = collection.get(cn.PC_COVARIANCE_ARR)
+        weight_arr = collection.get(cn.PC_WEIGHT_ARR)
         if covariance_arr is None:
             raise ValueError("Covariance array must be provided.")
         if len(covariance_arr) > 1:
