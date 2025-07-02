@@ -145,12 +145,12 @@ class RandomMixture(Random):
         self.dcollection = DCollectionMixture(**dcollection_dct)
         return self.dcollection
     
-    def predict(self, variate_arr:np.ndarray, collection:Optional[PCollectionMixture]=None)-> float:
+    def predict(self, single_variate_arr:np.ndarray, collection:Optional[PCollectionMixture]=None)-> np.ndarray:
         """
         Predicts the probability density function (PDF) for a given array of variates using the Gaussian Mixture Model.
 
         Args:
-            variate_arr (np.ndarray): Array of variates to evaluate the PDF.
+            variate_arr (np.ndarray): Single variate array of shape (1, num_dimension).
 
         Returns:
             np.ndarray: Array of predicted PDF values for each variate.
@@ -172,10 +172,10 @@ class RandomMixture(Random):
             covariance = covariance_arr[i_component, :, :]
             mean = mean_arr[i_component, :]
             mvn = multivariate_normal(mean=mean, cov=covariance)   # type: ignore
-            density = mvn.pdf(variate_arr)
+            density = mvn.pdf(single_variate_arr)
             densities.append(weight*density)
         density_arr = np.sum(densities, axis=0)  # Sum the PDFs of all components
-        return density_arr
+        return np.array([density_arr])
 
     def calculateEntropy(self, collection:PCollectionMixture) -> float:
         """
