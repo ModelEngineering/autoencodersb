@@ -1,0 +1,112 @@
+'''Interpolation for multivariate functions.'''
+import iplane.constants as cn
+from iplane.random import Random, PCollection, DCollection  # type: ignore
+
+from collections import namedtuple
+import numpy as np
+import pandas as pd  # type: ignore
+import matplotlib.pyplot as plt
+from typing import Tuple, Any, Optional, Dict, List, cast
+
+
+"""
+Notation:
+    N - number of samples (first dimension of the variate_arr, sample_arr)
+    D - number of variate dimensions (second dimension of the variate_arr)
+"""
+class Interpolator(object):
+
+    def __init__(self, variate_arr:np.ndarray, sample_arr:np.ndarray,
+            is_normalize:bool=True, max_distance:float=1.0,
+            size_interpolation_set:int=5,
+    ):
+        """
+        Multivariate interpolator for empirical distributions. A point is a vector in the variate space.
+            N - number of samples
+            D - number of variate dimensions
+        Args:
+            variate_arr (np.ndarray N X D)
+            sample_arr (np.ndarray N X ?)
+            is_normalize (bool, optional): normalize values of the variate_arr by dividing by standard deviation.
+            max_distance (float, optional): maximum distance between a variate_arr entry and points to be estimated
+            max_size_interpolation_set (int, optional): _description_. Defaults to 5.
+        """
+        self.variate_arr = np.array(variate_arr, dtype=float)
+        self.sample_arr = np.array(sample_arr, dtype=float)
+        self.num_sample = self.variate_arr.shape[0]
+        self.num_variate_dimension = self.variate_arr.shape[1]
+        self.is_normalize = is_normalize
+        self.max_distance = max_distance
+        self.size_interpolation_set = size_interpolation_set
+        #
+        self.std_arr = np.std(self.variate_arr, axis=0)
+        self.normalized_variate_arr = self._normalize(self.variate_arr)
+
+    def _normalize(self, point_arr:np.ndarray) -> np.ndarray:
+        """Normalizes the point array by dividing each variate by its standard deviation.
+
+        Args:
+            point_arr (np.ndarray): shape: (N,) or (N, D) where N is the number of samples and D is the number of dimensions.
+
+        Returns:
+            np.ndarray: _description_
+        """
+        return point_arr / self.std_arr
+    
+    def _getIndexNearestVariate(self, point_arr:np.ndarray, exclude_idxs:List[int]) -> Tuple[int, float]:
+        """Finds the closest variates to the given point in the variate space.
+
+        Args:
+            point_arr (np.ndarray): Point in the variate space.
+            exclude_idxs (List[int]): List of indices to exclude from the search.
+
+        Returns:
+            index of closest variate (int). If distance > max_distance, returns -1.
+        """
+        if self.is_normalize:
+            point_arr = self._normalize(point_arr)
+            variate_arr = self.normalized_variate_arr
+        else:
+            variate_arr = self.variate_arr
+        # Exclude specified indices
+        exclude_arr = np.array(exclude_idxs, dtype=int)
+        variate_arr[exclude_arr] = np.inf  # Set excluded variates to infinity
+        # Calculate squared differences
+        distance_arr = np.sqrt(np.sum((variate_arr - point_arr)**2, axis=1))
+        idx = cast(int, np.argmin(distance_arr))
+        distance = distance_arr[idx]
+        if distance > self.max_distance:
+            idx = -1
+        return idx, distance
+    
+    def predict(self, point_arr:np.ndarray) -> np.ndarray:
+        """Estimates the value from the sample_arr.
+
+        Args:
+            point_arr (np.ndarray): Variate to estimate the probability for.
+                It is a 1D array of variates, e.g. [x1, x2, ..., xD] for D dimensions.
+
+        Returns:
+            np.ndarray: Value in the sample_arr space
+        """
+        # Initializations
+        exclude_idxs:list = []
+        distances:list = []
+        predictions:list = []
+        # Iteratively find estimates
+        for _ in range(self.size_interpolation_set):
+            idx, distance = self._getIndexNearestVariate(point_arr, exclude_idxs)
+            if idx < 0:
+                break
+            predictions.append(self.sample_arr[idx])
+            distances.append(distance)
+            exclude_idxs.append(idx)
+        if len(predictions) == 0:
+            result = np.repeat(np.inf, self.num_variate_dimension)
+        else:
+            # FIXME: Weight by distance
+            weight_arr = np.array(distances, dtype=float)
+            weight_arr = 1 / (weight_arr + 1e-8)  # Avoid division by zero
+            prediction_arr = np.array(predictions, dtype=float)
+            result = np.sum(weight_arr[:, np.newaxis] * prediction_arr, axis=0) / np.sum(weight_arr)
+        return result

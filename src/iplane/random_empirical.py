@@ -253,3 +253,59 @@ class RandomEmpirical(Random):
         cdf_arr = cdf_arr[idx_arr]
         #
         return CDF(variate_arr=full_variate_arr, cdf_arr=cdf_arr)
+    
+    def multivariatePredict(self, multiple_variate_arr:np.ndarray, collection:Optional[PCollectionEmpirical]=None) -> np.ndarray:
+        """Predicts the culmulative probability of a variate based on the empirical distribution.
+
+        Args:
+            multiple_variate_arr (np.ndarray): Array of points in multivariate space to predict.
+            pcollection (Optional[PCollectionEmpirical], optional): PCollectionEmpirical with the parameters of the distribution. Defaults to None.
+
+        Returns:
+            float: Probability of the variate.
+        """
+        # Initializations
+        pcollection = cast(DCollectionEmpirical, self.setPCollection(collection))
+        training_arr = pcollection.get(cn.PC_TRAINING_ARR)
+        normalized_arr =
+        cdf = self.makeCDF(training_arr)
+        # Fixme standardize the variates so that all dimensions have the same standard deviation.
+        variate_arr = cdf.variate_arr
+        cdf_arr = cdf.cdf_arr
+        ##
+        def getClosestValue(variate:np.ndarray, squared_difference_arr:Optional[np.ndarray]=None
+                ) -> Tuple[np.ndarray, float]:
+            """Find the value that is closest to the variate.
+            Args:
+                variate (np.ndarray): The variate to compare.
+            Returns:
+                squared_difference_arr (np.ndarray): Squared differences between the variate and variate_arr.
+                value1 (float): Density value corresponding to the closest variate.
+            """
+            if squared_difference_arr is None:
+                squared_difference_arr = (variate - variate_arr)**2
+            squared_difference_arr = cast(np.ndarray, squared_difference_arr)
+            distance_arr = np.sqrt(np.sum(squared_difference_arr, axis=1))
+            idx = cast(int, np.argmin(distance_arr))
+            value = cdf_arr[idx]
+            squared_difference_arr[idx] = np.inf
+            return squared_difference_arr, value
+        ##
+        #
+        # FIXME: Do top N closest variates?
+        # Find the two closest values in the variate_arr to the single_variate_arr and obtain their densities.
+        estimates:list = []
+        for variate in multiple_variate_arr:
+            squared_difference_arr = (variate - variate_arr)**2
+            idx1 = np.argmin(squared_difference_arr)
+            value1 = density_arr[idx1]
+            squared_difference_arr[idx1] = np.inf  # Ignore the closest point
+            idx2 = np.argmin(squared_difference_arr)
+            value2 = density_arr[idx2]
+            # Interpolate between the two closest points
+            distance1 = np.sqrt(np.sum(np.abs(variate_arr[idx1] - single_variate_arr))**2)
+            distance2 = np.sqrt(np.sum(np.abs(variate_arr[idx2] - single_variate_arr))**2)
+            estimate = (value1 * distance2 + value2 * distance1) / (distance1 + distance2)
+            estimates.append(estimate)
+        #
+        return np.array(estimates)
