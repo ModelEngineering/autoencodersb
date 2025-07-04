@@ -16,6 +16,7 @@ CDF = namedtuple('CDF', ['variate_arr', 'cdf_arr'])
 1. Interpolate for multivariate CDF
 2. dcollection is CDF
 3. construction distribtion for variate_arr
+4. variate_arr is a 1D point. point_arr is a 2D array of points.
 """
 
 
@@ -71,6 +72,31 @@ class RandomEmpirical(Random):
         super().__init__(pcollection, dcollection)
         self.total_num_sample = total_num_sample
         self.window_size = window_size
+        self._initialize()
+
+    def _initialize(self) -> None:
+        self._min_point: Optional[np.ndarray] = None
+        self._max_point: Optional[np.ndarray] = None
+
+    @property
+    def min_point(self) -> np.ndarray:
+        """Minimum point in the variate space."""
+        if self._min_point is None:
+            if self.pcollection is None:
+                raise RuntimeError("PCollection has not been set.")
+            sample_arr = cast(np.ndarray, self.pcollection.get(cn.PC_TRAINING_ARR))
+            self._min_point = cast(np.ndarray, np.min(sample_arr, axis=0))
+        return self._min_point
+    
+    @property
+    def max_point(self) -> np.ndarray:
+        """Maximum point in the variate space."""
+        if self._max_point is None:
+            if self.pcollection is None:
+                raise RuntimeError("PCollection has not been set.")
+            sample_arr = cast(np.ndarray, self.pcollection.get(cn.PC_TRAINING_ARR))
+            self._max_point = cast(np.ndarray, np.max(sample_arr, axis=0))
+        return self._max_point
 
     def estimatePCollection(self, sample_arr:np.ndarray)-> PCollectionEmpirical:
         """Estimates the PCollectionEmpirical values from a categorical array.
@@ -78,9 +104,8 @@ class RandomEmpirical(Random):
         Args:
             categorical_arr (np.ndarray): _description_
         """
-        sample_arr = np.array(sample_arr, dtype=float)
-        sample_arr.sort()
         self.pcollection = PCollectionEmpirical(training_arr=sample_arr)
+        self._initialize()
         return self.pcollection
 
     def _calculateEmpiricalCDF(self) -> Tuple[np.ndarray, np.ndarray]:
@@ -113,17 +138,15 @@ class RandomEmpirical(Random):
         """
         pcollection = self.setPCollection(pcollection)
         sample_arr = cast(np.ndarray, pcollection.get(cn.PC_TRAINING_ARR))
-        if sample_arr.ndim != 1:
-            raise ValueError(f"Expected 1D array, got {sample_arr.ndim}D array.")
+        if sample_arr.ndim != 2:
+            raise ValueError(f"Expected 2D array, got {sample_arr.ndim}D array.")
+        # FIXME: Consider multiple dimensions and calculate dx_arr
         if variate_arr is None:
             variate_arr = cast(np.ndarray, np.linspace(min(sample_arr), max(sample_arr), self.total_num_sample))
+        # Find CDF values doing interpolation
+        # Calculate density_arr. How is this done in multiple dimensions where the variates don't
+        # change simulataneously? Must only consider "interior" points. SHould I be doing numerical integration?
         dx_arr = np.array(np.mean(np.diff(variate_arr)))
-        # Extend the variate_arr by self.window_size so that the result is the same as the original variate_arr.
-        if False:
-            tail_arr = variate_arr[-1] + np.cumsum(np.repeat(dx_arr, self.window_size-1))
-            new_variate_arr = np.hstack([variate_arr, tail_arr])
-        else:
-            new_variate_arr = variate_arr
         # Approximate the CDF
         sorted_sample_arr, cdf_arr = self._calculateEmpiricalCDF()
         # Calculate the density function for the sample_arr
@@ -139,7 +162,7 @@ class RandomEmpirical(Random):
             density_arr=density_arr,
             dx_arr=np.array([dx_arr])
         )
-        full_density_arr = self.predict(new_variate_arr, initial_dcollection)
+        full_density_arr = self.predict(variate_arr, initial_dcollection)
         #
         #
         dcollection = DCollectionEmpirical(
@@ -223,7 +246,7 @@ class RandomEmpirical(Random):
         """Constructs a CDF from a two dimensional array of variates. Rows are instances; columns are variables.
 
         Args:
-            variate_arr (np.ndarray):
+            variate_arr (np.ndarray) (N X D): An array of points, each of which is a D-dimensional array.
 
         Returns:
             CDF
@@ -237,75 +260,26 @@ class RandomEmpirical(Random):
         num_sample = variate_arr.shape[0]
         num_variable = variate_arr.shape[1]
         #
-        for variate in variate_arr:
-            less_than_arr = variate_arr <= variate
-            satisfies_arr = np.sum(less_than_arr, axis=1) == num_variable
-            cdfs.append(np.sum(satisfies_arr))
-        cdf_arr = np.array(cdfs, dtype=float)
-        if np.sum(cdf_arr == num_sample) == 0:
-            variate = np.array([max(variate_arr[:, n]) for n in range(num_variable)])
-            cdf_arr = np.hstack([cdf_arr, np.array([num_sample])])
-            full_variate_arr = np.vstack([variate_arr, variate])
+        for point in variate_arr:
+            less_than_arr = variate_arr <= point
+            less_satisfies_arr = np.sum(less_than_arr, axis=1) == num_variable
+            count_less = np.sum(less_satisfies_arr) - 1
+            cdf_val = count_less/num_sample
+            cdfs.append(cdf_val)
+        # Add a new point if there is none that is greater than all
+        if all([np.all(p != self.min_point) for p in variate_arr]):
+            cdfs.append(0)
+            full_variate_arr = np.vstack([variate_arr, np.array([self.min_point])])
         else:
             full_variate_arr = variate_arr
-        idx_arr = np.argsort(cdf_arr)
-        full_variate_arr = full_variate_arr[idx_arr]
-        cdf_arr = cdf_arr[idx_arr]
+        # Add a new point if the max point does't exist
+        if all([np.all(p != self.max_point) for p in variate_arr]):
+            cdfs.append(1)
+            full_variate_arr = np.vstack([variate_arr, np.array([self.max_point])])
+        else:
+            full_variate_arr = variate_arr
+        # Complete the cdf calculations
+        cdf_arr = np.array(cdfs, dtype=float)
+        #distance_arr = np.sqrt(np.sum(full_variate_arr**2, axis=1))
         #
         return CDF(variate_arr=full_variate_arr, cdf_arr=cdf_arr)
-    
-    def multivariatePredict(self, multiple_variate_arr:np.ndarray, collection:Optional[PCollectionEmpirical]=None) -> np.ndarray:
-        """Predicts the culmulative probability of a variate based on the empirical distribution.
-
-        Args:
-            multiple_variate_arr (np.ndarray): Array of points in multivariate space to predict.
-            pcollection (Optional[PCollectionEmpirical], optional): PCollectionEmpirical with the parameters of the distribution. Defaults to None.
-
-        Returns:
-            float: Probability of the variate.
-        """
-        # Initializations
-        pcollection = cast(DCollectionEmpirical, self.setPCollection(collection))
-        training_arr = pcollection.get(cn.PC_TRAINING_ARR)
-        normalized_arr =
-        cdf = self.makeCDF(training_arr)
-        # Fixme standardize the variates so that all dimensions have the same standard deviation.
-        variate_arr = cdf.variate_arr
-        cdf_arr = cdf.cdf_arr
-        ##
-        def getClosestValue(variate:np.ndarray, squared_difference_arr:Optional[np.ndarray]=None
-                ) -> Tuple[np.ndarray, float]:
-            """Find the value that is closest to the variate.
-            Args:
-                variate (np.ndarray): The variate to compare.
-            Returns:
-                squared_difference_arr (np.ndarray): Squared differences between the variate and variate_arr.
-                value1 (float): Density value corresponding to the closest variate.
-            """
-            if squared_difference_arr is None:
-                squared_difference_arr = (variate - variate_arr)**2
-            squared_difference_arr = cast(np.ndarray, squared_difference_arr)
-            distance_arr = np.sqrt(np.sum(squared_difference_arr, axis=1))
-            idx = cast(int, np.argmin(distance_arr))
-            value = cdf_arr[idx]
-            squared_difference_arr[idx] = np.inf
-            return squared_difference_arr, value
-        ##
-        #
-        # FIXME: Do top N closest variates?
-        # Find the two closest values in the variate_arr to the single_variate_arr and obtain their densities.
-        estimates:list = []
-        for variate in multiple_variate_arr:
-            squared_difference_arr = (variate - variate_arr)**2
-            idx1 = np.argmin(squared_difference_arr)
-            value1 = density_arr[idx1]
-            squared_difference_arr[idx1] = np.inf  # Ignore the closest point
-            idx2 = np.argmin(squared_difference_arr)
-            value2 = density_arr[idx2]
-            # Interpolate between the two closest points
-            distance1 = np.sqrt(np.sum(np.abs(variate_arr[idx1] - single_variate_arr))**2)
-            distance2 = np.sqrt(np.sum(np.abs(variate_arr[idx2] - single_variate_arr))**2)
-            estimate = (value1 * distance2 + value2 * distance1) / (distance1 + distance2)
-            estimates.append(estimate)
-        #
-        return np.array(estimates)

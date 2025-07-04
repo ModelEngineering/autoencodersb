@@ -7,12 +7,12 @@ import numpy as np
 from typing import List, Any, Tuple
 import unittest
 
-IGNORE_TESTS = True
-IS_PLOT = True
+IGNORE_TESTS = False
+IS_PLOT = False
 NUM_SAMPLE = 50
 STD = 4
-GAUSSIAN_SAMPLE_ARR = np.random.normal(loc=5, scale=STD, size=NUM_SAMPLE)  # Sample for testing
-UNIFORM_SAMPLE_ARR = np.random.uniform(low=0, high=8, size=NUM_SAMPLE)  # Uniform sample for testing
+GAUSSIAN_SAMPLE_ARR = np.random.normal(loc=5, scale=STD, size=NUM_SAMPLE).reshape(-1, 1)  # Sample for testing
+UNIFORM_SAMPLE_ARR = np.random.uniform(low=0, high=8, size=NUM_SAMPLE).reshape(-1, 1)  # Uniform sample for testing
 
 
 class TestRandomEmpirical(unittest.TestCase):
@@ -69,7 +69,9 @@ class TestRandomEmpirical(unittest.TestCase):
             weight_arr=np.array([1.0])
         )
         sample_arr = self.random_mixture.generateSample(pcollection, 500) 
-        cdf = self.random.makeCDF(sample_arr)
+        random_empirical = RandomEmpirical(total_num_sample=500)
+        random_empirical.estimatePCollection(sample_arr)
+        cdf = random_empirical.makeCDF(sample_arr)
         self.assertTrue(isinstance(cdf.variate_arr, np.ndarray))
         self.assertTrue(isinstance(cdf.cdf_arr, np.ndarray))
         self.assertEqual(cdf.variate_arr.shape[0], cdf.cdf_arr.shape[0])
@@ -83,8 +85,8 @@ class TestRandomEmpirical(unittest.TestCase):
 
     def testMakeCDFBivariate(self):
         """Test the creation of CDF from variate array."""
-        #if IGNORE_TESTS:
-        #    return
+        if IGNORE_TESTS:
+            return
         STD = 2
         matrix = np.array([[STD, 0.1], [0.1, STD]])  # Identity matrix for covariance
         pcollection = PCollectionMixture(
@@ -93,7 +95,9 @@ class TestRandomEmpirical(unittest.TestCase):
             weight_arr=np.array([1.0])
         )
         sample_arr = self.random_mixture.generateSample(pcollection, 500) 
-        cdf = self.random.makeCDF(sample_arr)
+        random_empirical = RandomEmpirical(total_num_sample=500)
+        random_empirical.estimatePCollection(sample_arr)
+        cdf = random_empirical.makeCDF(sample_arr)
         self.assertTrue(isinstance(cdf.variate_arr, np.ndarray))
         self.assertTrue(isinstance(cdf.cdf_arr, np.ndarray))
         self.assertEqual(cdf.variate_arr.shape[0], cdf.cdf_arr.shape[0])

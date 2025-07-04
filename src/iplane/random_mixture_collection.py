@@ -194,6 +194,46 @@ class PCollectionMixture(PCollection):
         if result is cn.NULL_ARR:
             raise ValueError(f"Parameter '{name}' has no valid shape.")
         return result
+    
+    @classmethod
+    def make(cls, 
+            num_component:int=2,
+            num_dim:int=1,
+            variance:float=0.5,
+            covariance:float=0.0,  # Between non-identical dimen
+            weight_arr:Optional[np.ndarray]=None,
+            ) -> 'PCollectionMixture':
+        """
+        Factory method to create a PCollectionMixture instance.
+
+        Args:
+            num_component (int): Number of components in the mixture.
+            num_dim (int): Number of dimensions for each component.
+            variance (float): Variance for the Gaussian components.
+            covariance (float): Covariance between different dimensions.
+            weight_arr (Optional[np.ndarray]): Optional array of weights for each component.
+                    If None, weights are uniform.
+
+        Returns:
+            PCollectionMixture: Instance of PCollectionMixture. Weights are proportional to
+            the sample size of each component.
+        """
+        means:list = []
+        covariances:list = []
+        if weight_arr is None:
+            weight_arr = np.repeat(1/num_component, num_component)
+        # Construct the means and covariances for each component
+        for n_component in range(num_component):
+                means.append([5*n_component + 0.2*n_dim for n_dim in range(1, num_dim + 1)])
+                # Covariances
+                matrix = np.repeat(covariance, num_dim*num_dim).reshape((num_dim, num_dim))
+                np.fill_diagonal(matrix, variance)
+                covariances.append(matrix)
+        covariance_arr = np.array(covariances)
+        mean_arr = np.reshape(np.array(means), (num_component, num_dim))
+        pcollection = PCollectionMixture(mean_arr= mean_arr, covariance_arr=covariance_arr,
+                weight_arr= weight_arr)
+        return pcollection
 
 
 

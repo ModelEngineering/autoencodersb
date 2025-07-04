@@ -41,6 +41,25 @@ class Interpolator(object):
         #
         self.std_arr = np.std(self.variate_arr, axis=0)
         self.normalized_variate_arr = self._normalize(self.variate_arr)
+        self.min_value = np.array(np.min(self.variate_arr, axis=0))
+        self.max_value = np.array(np.max(self.variate_arr, axis=0))
+
+    def isWithinRange(self, point_arr:np.ndarray) -> bool:
+        """
+        Determines if point is within the range for interpolation
+
+        Args:
+            point_arr (np.ndarray): _description_
+
+        Returns:
+            bool: _description_
+        """
+        is_less_than = np.all(point_arr < self.variate_arr)
+        is_greater_than = np.all(point_arr > self.variate_arr)
+        if is_less_than or is_greater_than:
+            return False
+        else:
+            return True
 
     def _normalize(self, point_arr:np.ndarray) -> np.ndarray:
         """Normalizes the point array by dividing each variate by its standard deviation.
@@ -64,10 +83,10 @@ class Interpolator(object):
             index of closest variate (int). If distance > max_distance, returns -1.
         """
         if self.is_normalize:
-            point_arr = self._normalize(point_arr)
-            variate_arr = self.normalized_variate_arr
+            point_arr = np.array(self._normalize(point_arr))
+            variate_arr = np.array(self.normalized_variate_arr)
         else:
-            variate_arr = self.variate_arr
+            variate_arr = np.array(self.variate_arr)
         # Exclude specified indices
         exclude_arr = np.array(exclude_idxs, dtype=int)
         variate_arr[exclude_arr] = np.inf  # Set excluded variates to infinity
@@ -85,6 +104,7 @@ class Interpolator(object):
         Args:
             point_arr (np.ndarray): Variate to estimate the probability for.
                 It is a 1D array of variates, e.g. [x1, x2, ..., xD] for D dimensions.
+                Result is np.nan if no variates are found within the max_distance
 
         Returns:
             np.ndarray: Value in the sample_arr space
@@ -102,11 +122,12 @@ class Interpolator(object):
             distances.append(distance)
             exclude_idxs.append(idx)
         if len(predictions) == 0:
-            result = np.repeat(np.inf, self.num_variate_dimension)
+            result_arr = np.repeat(np.nan, self.num_variate_dimension)
         else:
-            # FIXME: Weight by distance
             weight_arr = np.array(distances, dtype=float)
             weight_arr = 1 / (weight_arr + 1e-8)  # Avoid division by zero
             prediction_arr = np.array(predictions, dtype=float)
-            result = np.sum(weight_arr[:, np.newaxis] * prediction_arr, axis=0) / np.sum(weight_arr)
-        return result
+            result_arr = np.sum(weight_arr * prediction_arr, axis=0) / np.sum(weight_arr)
+            if isinstance(result_arr, float):
+                result_arr = np.array([result_arr])
+        return result_arr
