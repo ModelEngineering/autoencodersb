@@ -1,4 +1,8 @@
 # TASKS
+# Evaluate the quality of empirical fits
+* Multicomponent GMM
+* Evaluate estimation of entropy with incremental grid sizes
+# Clean up existing code
 # Evaluate the quality of GMM fits
 * Estimator
   * Constructed with a sample
@@ -15,7 +19,7 @@
   * Parameters - lower, upper bound
   * Distribution - density_arr, dx
 * How well can GMM fit a unifrom distribution? Look at distance of fit from distribution? Look at difference in entropy?
-# Investigate culmulative entrop
+# Investigate culmulative entropy
 * Calculate entropy for parts of a distribution
 # Joint distribution
 * Calculate joint distribution of GMM and categorical.

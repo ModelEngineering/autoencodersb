@@ -82,6 +82,7 @@ class PCollectionMixture(PCollection):
         elif mean_arr.ndim == 1 and covariance_arr.ndim == 1:
             is_correct_shape = True
         if not is_correct_shape:
+            import pdb; pdb.set_trace()
             raise ValueError("Either mean_arr must be 2D and covariance_arr must be 3D, or both must be 1D.")
         num_component = mean_arr.shape[0]
         num_dimension = mean_arr.shape[1] if mean_arr.ndim == 2 else 1
