@@ -1,8 +1,13 @@
 # TASKS
+# Clean up existing code
+* RandomContinuous: variate\_arr, dx\_arr, density\_arr
+* Has predict method that estimates density for N X M array of points
+* Calculates variate, dx, density
+* Calculates entropy
+* makeDCollection uses calcVariate, calcDx, calcDensity
 # Evaluate the quality of empirical fits
 * Multicomponent GMM
 * Evaluate estimation of entropy with incremental grid sizes
-# Clean up existing code
 # Evaluate the quality of GMM fits
 * Estimator
   * Constructed with a sample

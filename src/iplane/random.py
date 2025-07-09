@@ -1,11 +1,10 @@
-'''Random estimates parameters and generates random samples from parameters.'''
+'''Abstract class for estimating parameters and generating random samples from parameters.'''
 
 """ 
 This is an abstract class for estimating parameters of a distribution.
 A subclass implements the estimate and generate methods. It is responsible for constructing
 a Parameter object appropriate for these methods. Generated distributions are stored in a Distribution object.
 """
-import iplane.constants as cn
 
 import numpy as np
 from typing import Any, Optional, Dict, List, Union, cast
@@ -113,12 +112,12 @@ class Random(object):
         """Estimates the Parameter instance for from the data array."""
         raise NotImplementedError("This method should be overridden by subclasses.")
     
-    def predict(self, single_variate_arr:np.ndarray, collection:Optional[Any]=None) -> np.ndarray:
+    def predict(self, *args, **kwargs) -> np.ndarray:
         """Predict the probability of a single variate_arr (multiple dimensions)."""
         """Uses saved PCollection if this is not specified."""
         raise NotImplementedError("This method should be overridden by subclasses.")
     
-    def makeDCollection(self, variate_arr:Optional[np.ndarray]=None, pcollection:Optional[Any]=None)  -> DCollection:
+    def makeDCollection(self, *args, **kwargs)  -> DCollection:
         """Create a Distribution object from the ParameterCollection."""
         raise NotImplementedError("This method should be overridden by subclasses.")
 

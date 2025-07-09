@@ -89,7 +89,7 @@ class RandomDiscrete(Random):
         plt.show()
 
     def calculateEntropy(self, collection:PCollectionDiscrete)->float:
-        """Analytical calculation of entropy for a categorical array.
+        """Analytical calculation of entropy for a discrete random variable.
 
         Args:
             categorical_arr (np.ndarray): Array of categorical data.

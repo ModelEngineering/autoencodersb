@@ -1,7 +1,7 @@
 '''Collection classes used by RandomMixture of Gaussian distribution.'''
 
 import iplane.constants as cn  # type: ignore
-from iplane.random import PCollection, DCollection
+from iplane.random_continuous import PCollectionContinuous, DCollectionContinuous # type: ignore
 
 import collections
 import pandas as pd  # type: ignore
@@ -15,7 +15,7 @@ DCollectionShape = collections.namedtuple('DCollectionShape', ['num_sample', 'nu
 
 
 ################################################
-class PCollectionMixture(PCollection):
+class PCollectionMixture(PCollectionContinuous):
     # Parameter collection for mixture of Gaussian distributions.
     #   C: number of components
     #   D: number of dimensions
@@ -41,6 +41,37 @@ class PCollectionMixture(PCollection):
         )
         super().__init__(cn.PC_MIXTURE_NAMES, dct)
         self.isValid()
+        # Calculated
+        self._std_point = np.array([])
+        self._center_point = np.array([])
+        self.num_dimension = mean_arr.shape[1] if mean_arr.ndim == 2 else 0  # type: ignore
+
+    @property
+    def std_point(self) -> np.ndarray:
+        """
+        Returns a point representing one standard deviation in each dimension.
+        """
+        if self._std_point.size == 0:
+            self._std_point = np.sqrt(np.diagonal(self.get(cn.PC_COVARIANCE_ARR), axis1=1, axis2=2))
+        return self._std_point
+    
+    @property
+    def center_point(self) -> np.ndarray:
+        """
+        Returns a center point for the distribution, typically the mean.
+        """
+        if self._center_point.size == 0:
+            mean_arr, covariance_arr, _ = self.getAll()
+            self._center_point = np.mean(self.get(cn.PC_MEAN_ARR), axis=0)
+        return self._center_point
+        
+    
+    @property
+    def num_dimension(self) -> int:
+        """
+        Returns the number of dimensions for the distribution.
+        """
+        return len(self.center_point)
 
     def __str__(self) -> str:
         """
@@ -239,7 +270,7 @@ class PCollectionMixture(PCollection):
 
 
 ################################################
-class DCollectionMixture(DCollection):
+class DCollectionMixture(DCollectionContinuous):
     # Distribution collection for mixture of Gaussian distributions.
     #   C: number of components
     #   N: number of samples
@@ -260,7 +291,7 @@ class DCollectionMixture(DCollection):
             dx_arr=dx_arr,
             entropy=entropy,
         )
-        super().__init__(cn.DC_MIXTURE_NAMES, dct)
+        super().__init__(variate_arr=variate_arr, density_arr=density_arr, dx_arr=dx_arr, entropy=entropy)
         self.actual_collection_dct = dct
         self.isAllValid()
 

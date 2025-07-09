@@ -1,12 +1,10 @@
 '''Describes a continuous distribution based on empirical data.'''
 import iplane.constants as cn
-from iplane.random import Random, PCollection, DCollection  # type: ignore
+from iplane.random_continuous import RandomContinuous, PCollectionContinuous, DCollectionContinuous  # type: ignore
 
 from collections import namedtuple
 import numpy as np
-import pandas as pd  # type: ignore
 import matplotlib.pyplot as plt
-from scipy import interpolate  # type: ignore
 from sklearn.isotonic import IsotonicRegression # type: ignore
 from typing import Tuple, Any, Optional, Dict, List, cast
 
@@ -21,7 +19,7 @@ CDF = namedtuple('CDF', ['variate_arr', 'cdf_arr'])
 
 
 ################################################
-class PCollectionEmpirical(PCollection):
+class PCollectionEmpirical(PCollectionContinuous):
     # Parameter collection for mixture of Gaussian distributions.
 
     def __init__(self, training_arr:np.ndarray)->None:
@@ -32,38 +30,13 @@ class PCollectionEmpirical(PCollection):
 
 
 ################################################
-class DCollectionEmpirical(DCollection):
+class DCollectionEmpirical(DCollectionContinuous):
     # Distribution collection for mixture of Gaussian distributions.
-
-    def __init__(self, 
-            fitter:Optional[Any]=None,
-            variate_arr:Optional[np.ndarray]=None,
-            density_arr:Optional[np.ndarray]=None,
-            dx_arr:Optional[np.ndarray]=None,
-            entropy:Optional[float]=None)->None:
-        collection_dct = {
-            cn.DC_VARIATE_ARR: variate_arr,
-            cn.DC_DENSITY_ARR: density_arr,
-            cn.DC_DX_ARR: dx_arr,
-            cn.DC_ENTROPY: entropy
-        }
-        super().__init__(cn.DC_EMPIRICAL_NAMES, collection_dct)
-
-    def getAll(self) ->Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
-        """
-        Returns all parameters as a tuple of numpy arrays.
-                    variate_arr: np.ndarray, density_arr: np.ndarray, dx_arr: np.ndarray, entropy: float
-        """
-        variate_arr, density_arr, dx_arr, entropy =  (
-                cast(np.ndarray, self.get(cn.DC_VARIATE_ARR)),
-                cast(np.ndarray, self.get(cn.DC_DENSITY_ARR)), cast(np.ndarray, self.get(cn.DC_DX_ARR)),
-                cast(float, self.get(cn.DC_ENTROPY))
-        )
-        return variate_arr, density_arr, dx_arr, entropy
+    pass
 
 
 ################################################
-class RandomEmpirical(Random):
+class RandomEmpirical(RandomContinuous):
 
     def __init__(self, pcollection:Optional[PCollectionEmpirical]=None,
             dcollection:Optional[DCollectionEmpirical]=None,
@@ -123,8 +96,8 @@ class RandomEmpirical(Random):
         return sorted_sample_arr, cdf_arr
     
     def makeDCollection(self,
-            variate_arr:Optional[np.ndarray]=None,
-            pcollection:Optional[PCollection]=None) -> DCollectionEmpirical:
+            pcollection:PCollectionEmpirical, variate_arr:Optional[np.ndarray]=None,
+            dx_arr:Optional[np.ndarray]=None) -> DCollectionEmpirical:
         """Calculates entropy for the discrete random variable.
         Extends variate_arr by self.window_size so that the result is the same as the original variate_arr.
 
@@ -136,33 +109,31 @@ class RandomEmpirical(Random):
         Returns:
             DCollectionDiscrete:
         """
-        pcollection = self.setPCollection(pcollection)
         sample_arr = cast(np.ndarray, pcollection.get(cn.PC_TRAINING_ARR))
         if sample_arr.ndim != 2:
             raise ValueError(f"Expected 2D array, got {sample_arr.ndim}D array.")
         # FIXME: Consider multiple dimensions and calculate dx_arr
-        if variate_arr is None:
-            variate_arr = cast(np.ndarray, np.linspace(min(sample_arr), max(sample_arr), self.total_num_sample))
-        # Find CDF values doing interpolation
-        # Calculate density_arr. How is this done in multiple dimensions where the variates don't
-        # change simulataneously? Must only consider "interior" points. SHould I be doing numerical integration?
-        dx_arr = np.array(np.mean(np.diff(variate_arr)))
-        # Approximate the CDF
-        sorted_sample_arr, cdf_arr = self._calculateEmpiricalCDF()
-        # Calculate the density function for the sample_arr
-        density_arr = np.diff(cdf_arr)/dx_arr
-        density_arr = np.hstack([density_arr[0], density_arr])  # Compensate for the differencing
-        #   Smooth over a window
-        if False:
-            weights = np.ones(self.window_size) / self.window_size
-            density_arr = np.convolve(density_arr, weights, mode='valid')
-        # Calculate density for the variate_arr by interpolating the empirical CDF
+        if variate_arr is None
+            center_point = np.mean(sample_arr, axis=0)
+            std_arr = np.std(sample_arr, axis=0)
+            min_point = center_point - self.width_std*std_arr
+            max_point = center_point + self.width_std*std_arr
+            variate_result = self.makeVariate(
+                min_point=min_point,
+                max_point=max_point,
+                num_sample=self.total_num_sample
+            )
+            variate_arr, dx_arr = variate_result.variate_arr, variate_result.dx_arr
+        else:
+            if dx_arr is None:
+                raise ValueError("dx_arr must be provided if variate_arr is provided.")
+        # Use interpolate to construct the density from the empirical distribution
         initial_dcollection = DCollectionEmpirical(
             variate_arr=sorted_sample_arr[:len(density_arr)],
             density_arr=density_arr,
             dx_arr=np.array([dx_arr])
         )
-        full_density_arr = self.predict(variate_arr, initial_dcollection)
+        full_density_arr = self.predict(variate_arr, dcollection=initial_dcollection)
         #
         #
         dcollection = DCollectionEmpirical(
@@ -174,23 +145,11 @@ class RandomEmpirical(Random):
         dcollection.add(entropy=entropy)
         self.dcollection = dcollection
         return self.dcollection
-    
-    def calculateEntropy(self, collection:DCollectionEmpirical) -> float:
-        """
-        Calculates the entropy of a univariate empirical distribution.
 
-        Args:
-            covariance_arr (np.ndarray): Covariance matrix of the Gaussian distribution.
-
-        Returns:
-            float: Entropy of the Gaussian distribution.
-        """
-        dcollection = cast(DCollectionEmpirical, collection)
-        _, density_arr, dx_arr, entropy = dcollection.getAll()
-        entropy = - np.sum(density_arr * np.log2(density_arr + 1e-10) * dx_arr)
-        return entropy
-    
-    def predict(self, single_variate_arr:np.ndarray, collection:Optional[DCollectionEmpirical]=None) -> np.ndarray:
+    # FIXME: Calculate density from interpolation    
+    def predict(self, single_variate_arr:np.ndarray,
+            pcollection:Optional[PCollectionEmpirical]=None,
+            dcollection:Optional[DCollectionEmpirical]=None) -> np.ndarray:
         """Predicts the probability of a variate based on the empirical distribution.
 
         Args:
@@ -202,7 +161,7 @@ class RandomEmpirical(Random):
         """
         #
         # FIXME: Do top N closest variates?
-        dcollection = cast(DCollectionEmpirical, self.setDCollection(collection))
+        dcollection = cast(DCollectionEmpirical, self.setDCollection(dcollection))
         density_arr = dcollection.get(cn.DC_DENSITY_ARR)
         variate_arr = dcollection.get(cn.DC_VARIATE_ARR)
         # Find the two closest values in the variate_arr to the single_variate_arr and obtain their densities.
@@ -242,42 +201,42 @@ class RandomEmpirical(Random):
         #plt.plot(variate_arr[0:-(window_size-1)], density_arr); plt.show()
         #plt.plot(variate_arr[0:-(window_size-1)], np.cumsum(density_arr)); plt.show()
 
-    def makeCDF(self, variate_arr:np.ndarray) -> CDF:
+    def makeCDF(self, sample_arr:np.ndarray) -> CDF:
         """Constructs a CDF from a two dimensional array of variates. Rows are instances; columns are variables.
 
         Args:
-            variate_arr (np.ndarray) (N X D): An array of points, each of which is a D-dimensional array.
+            sample_arr (np.ndarray) (N X D): An array of points, each of which is a D-dimensional array.
 
         Returns:
             CDF
                 variate_arr (N X D)
                 cdf_arr (N): CDF corresponding to the variate_arr
         """
-        if variate_arr.ndim != 2:
-            raise ValueError(f"Expected 2D array, got {variate_arr.ndim}D array.")
+        if sample_arr.ndim != 2:
+            raise ValueError(f"Expected 2D array, got {sample_arr.ndim}D array.")
         #
         cdfs:list = []
-        num_sample = variate_arr.shape[0]
-        num_variable = variate_arr.shape[1]
+        num_sample = sample_arr.shape[0]
+        num_variable = sample_arr.shape[1]
         #
-        for point in variate_arr:
-            less_than_arr = variate_arr <= point
+        for point in sample_arr:
+            less_than_arr = sample_arr <= point
             less_satisfies_arr = np.sum(less_than_arr, axis=1) == num_variable
             count_less = np.sum(less_satisfies_arr) - 1
             cdf_val = count_less/num_sample
             cdfs.append(cdf_val)
         # Add a new point if there is none that is greater than all
-        if all([np.all(p != self.min_point) for p in variate_arr]):
+        if all([np.all(p != self.min_point) for p in sample_arr]):
             cdfs.append(0)
-            full_variate_arr = np.vstack([variate_arr, np.array([self.min_point])])
+            full_variate_arr = np.vstack([sample_arr, np.array([self.min_point])])
         else:
-            full_variate_arr = variate_arr
+            full_variate_arr = sample_arr
         # Add a new point if the max point does't exist
-        if all([np.all(p != self.max_point) for p in variate_arr]):
+        if all([np.all(p != self.max_point) for p in sample_arr]):
             cdfs.append(1)
-            full_variate_arr = np.vstack([variate_arr, np.array([self.max_point])])
+            full_variate_arr = np.vstack([sample_arr, np.array([self.max_point])])
         else:
-            full_variate_arr = variate_arr
+            full_variate_arr = sample_arr
         # Complete the cdf calculations
         cdf_arr = np.array(cdfs, dtype=float)
         #distance_arr = np.sqrt(np.sum(full_variate_arr**2, axis=1))
