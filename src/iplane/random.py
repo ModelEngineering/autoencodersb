@@ -86,7 +86,18 @@ class Collection(object):
                 if not np.isclose(this_value, other_value):
                     return False
         return True
-   
+    
+    def __str__(self) -> str:
+        """
+        Returns a string representation of the Collections object.
+        """
+        lines:list = [f"\n{self.__class__.__name__}:"]
+        for key in self.collection_names:
+            value = self.get(key)
+            lines.append(f"{key}:\n{value}")
+        msg = "\n".join(lines)
+        return(msg)
+
 
 ############################################
 class PCollection(Collection):
@@ -108,7 +119,7 @@ class Random(object):
         self.pcollection = pcollection
         self.dcollection = dcollection
 
-    def estimatePCollection(self, sample_arr: np.ndarray) -> PCollection:
+    def makePCollection(self, sample_arr: np.ndarray) -> PCollection:
         """Estimates the Parameter instance for from the data array."""
         raise NotImplementedError("This method should be overridden by subclasses.")
     
@@ -132,7 +143,7 @@ class Random(object):
     def evaluate(self, pcollection:Any, num_samples:int) -> bool:
         """Evaluate the calculation using a round trip of estimation and generation."""
         sample_arr = self.generateSample(pcollection, num_samples)
-        estimated_pcollection = self.estimatePCollection(sample_arr)
+        estimated_pcollection = self.makePCollection(sample_arr)
         dcollection = self.makeDCollection(pcollection=estimated_pcollection)
         return dcollection == self.makeDCollection(pcollection)
     

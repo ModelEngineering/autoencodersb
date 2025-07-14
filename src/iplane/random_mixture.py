@@ -1,16 +1,14 @@
 '''Random mixture of Gaussian distribution.'''
 import iplane.constants as cn  # type: ignore
-from iplane.random import Random, PCollection, DCollection, Collection  # type: ignore
-from iplane.random_continuous import RandomContinuous, VariateResult  # type: ignore
+from iplane.random_continuous import RandomContinuous  # type: ignore
 from iplane.random_mixture_collection import PCollectionMixture, DCollectionMixture  # type: ignore
 
-import itertools
 import pandas as pd  # type: ignore
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import multivariate_normal # type: ignore
 from sklearn.mixture import GaussianMixture  # type: ignore
-from typing import Union, Optional, cast
+from typing import Optional, cast
 import warnings
 
 
@@ -22,7 +20,6 @@ class RandomMixture(RandomContinuous):
             dcollection:Optional[DCollectionMixture]=None,
             num_component:int = 2,
             random_state:int = 42,
-            total_num_sample:int = cn.TOTAL_NUM_SAMPLE,
             **kwargs
             ):
         """
@@ -35,7 +32,6 @@ class RandomMixture(RandomContinuous):
             random_state (int): random state for reproducibility.
         """
         super().__init__(pcollection, dcollection, **kwargs)
-        self.total_num_sample = total_num_sample
         self.num_component = num_component
         self.random_state = random_state
         # Use k-means clustering to initialize the Gaussian Mixture Model
@@ -147,7 +143,7 @@ class RandomMixture(RandomContinuous):
             result = result.item()
         return result
 
-    def estimatePCollection(self, sample_arr:np.ndarray)->PCollectionMixture:
+    def makePCollection(self, sample_arr:np.ndarray)->PCollectionMixture:
         """
         Estimates the parameters of a Gaussian Mixture Model from the sample array.
 
@@ -173,8 +169,8 @@ class RandomMixture(RandomContinuous):
         )
         return self.pcollection
     
-    def makeDCollection(self, pcollection:PCollection, variate_result:Optional[VariateResult]=None,
-            ) -> DCollectionMixture:
+    def makeDCollection(self, pcollection:PCollectionMixture, variate_arr:Optional[np.ndarray]=None,
+            dx_arr:Optional[np.ndarray]=None) -> DCollectionMixture:
         """
         Calculates the probability density function (PDF) for a multi-dimensional Gaussian mixture model
         and calculates its differential entropy.
@@ -188,26 +184,24 @@ class RandomMixture(RandomContinuous):
             DistributionCollectionMGaussian: The distribution object containing the variate array, PDF array, dx array, and entropy.
         """
         # Initializations
-        pcollection = cast(PCollectionMixture, self.setPCollection(pcollection))
         mean_arr, covariance_arr, weight_arr = pcollection.getAll()
         shape = pcollection.getShape()
         num_component, num_dimension = shape.num_component, shape.num_dimension
         # Construct the variate array
-        if variate_result is None:
-            total_num_sample = self.total_num_sample
+        if variate_arr is None:
+            num_variate_sample = self.num_variate_sample
             std_arrs = np.array([np.sqrt(np.diagonal(covariance_arr[n, :, :])) for n in range(num_component)])
             std_arrs = np.reshape(std_arrs, (num_component, num_dimension))
-            min_arr = mean_arr - 0.5*self.width_std * std_arrs  # Calculate the minimum point for each dimension
-            max_arr = mean_arr + 0.5*self.width_std * std_arrs  # Calculate the minimum point for each dimension
+            min_arr = mean_arr - 0.5*self.axis_length_std * std_arrs  # Calculate the minimum point for each dimension
+            max_arr = mean_arr + 0.5*self.axis_length_std * std_arrs  # Calculate the minimum point for each dimension
             min_point = np.min(min_arr, axis=0)  # Minimum point across all 
             max_point = np.max(max_arr, axis=0)  # Maximum point across all 
-            variate_result = self.makeVariate(min_point, max_point, num_sample=total_num_sample)
-        variate_arr, dx_arr = variate_result.variate_arr, variate_result.dx_arr
-        total_num_sample = variate_arr.shape[0]
+            variate_arr, dx_arr = self.makeVariate(min_point, max_point, num_variate_sample=num_variate_sample)
+        num_variate_sample = variate_arr.shape[0]
         # Calculate the densities at each variate value
         density_arr = self.predict(variate_arr, dx_arr, pcollection=pcollection)
         # Calculate entropy
-        entropy = self.makeEntropy(density_arr= density_arr, dx_arr=dx_arr)
+        entropy = self.makeEntropy(density_arr= density_arr, dx_arr=cast(np.ndarray, dx_arr))
         # Construct the DCollectionMixture object
         self.dcollection = DCollectionMixture(
             variate_arr=variate_arr,

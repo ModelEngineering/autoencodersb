@@ -21,7 +21,7 @@ class TestRandomDiscrete(unittest.TestCase):
         def test(val:int):
             """Helper function to test entropy calculation."""
             arr = np.random.randint(0, val, NUM_SAMPLE)
-            pcollection = self.discrete.estimatePCollection(arr)
+            pcollection = self.discrete.makePCollection(arr)
             self.assertEqual(len(pcollection.get('category_arr')), val)
         ##
         test(2)
@@ -33,7 +33,7 @@ class TestRandomDiscrete(unittest.TestCase):
         def test(val:int):
             """Helper function to test entropy calculation."""
             arr = np.random.randint(0, val, NUM_SAMPLE)
-            pcollection = self.discrete.estimatePCollection(arr)
+            pcollection = self.discrete.makePCollection(arr)
             dcollection = self.discrete.makeDCollection(pcollection=pcollection)
             entropy = dcollection.get('entropy')
             self.assertAlmostEqual(entropy, np.log2(val), delta=0.1)

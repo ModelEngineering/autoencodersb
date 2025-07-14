@@ -26,7 +26,7 @@ class TestRandomEmpirical(unittest.TestCase):
         """Test the estimation of PCollectionEmpirical."""
         if IGNORE_TESTS:
             return
-        pcollection = self.random.estimatePCollection(GAUSSIAN_SAMPLE_ARR)
+        pcollection = self.random.makePCollection(GAUSSIAN_SAMPLE_ARR)
         self.assertIsInstance(pcollection, PCollectionEmpirical)
         self.assertTrue(np.array_equal(pcollection.get(cn.PC_TRAINING_ARR), GAUSSIAN_SAMPLE_ARR))
 
@@ -34,7 +34,7 @@ class TestRandomEmpirical(unittest.TestCase):
         """Test the creation of DCollectionEmpirical."""
         if IGNORE_TESTS:
             return
-        _ = self.random.estimatePCollection(GAUSSIAN_SAMPLE_ARR)
+        _ = self.random.makePCollection(GAUSSIAN_SAMPLE_ARR)
         dcollection = self.random.makeDCollection(pcollection=self.pcollection)
         pcollection_mixture = PCollectionMixture(
             mean_arr=np.array([[0]]),
@@ -53,7 +53,7 @@ class TestRandomEmpirical(unittest.TestCase):
         if IGNORE_TESTS:
             return
         return
-        self.random.estimatePCollection(GAUSSIAN_SAMPLE_ARR)
+        self.random.makePCollection(GAUSSIAN_SAMPLE_ARR)
         dcollection = self.random.makeDCollection()
         entropy = self.random.calculateEntropy(dcollection)
         self.assertIsInstance(entropy, float)
@@ -70,7 +70,7 @@ class TestRandomEmpirical(unittest.TestCase):
         )
         sample_arr = self.random_mixture.generateSample(pcollection, 500) 
         random_empirical = RandomEmpirical(total_num_sample=500)
-        random_empirical.estimatePCollection(sample_arr)
+        random_empirical.makePCollection(sample_arr)
         cdf = random_empirical.makeCDF(sample_arr)
         self.assertTrue(isinstance(cdf.variate_arr, np.ndarray))
         self.assertTrue(isinstance(cdf.cdf_arr, np.ndarray))
@@ -96,7 +96,7 @@ class TestRandomEmpirical(unittest.TestCase):
         )
         sample_arr = self.random_mixture.generateSample(pcollection, 500) 
         random_empirical = RandomEmpirical(total_num_sample=500)
-        random_empirical.estimatePCollection(sample_arr)
+        random_empirical.makePCollection(sample_arr)
         cdf = random_empirical.makeCDF(sample_arr)
         self.assertTrue(isinstance(cdf.variate_arr, np.ndarray))
         self.assertTrue(isinstance(cdf.cdf_arr, np.ndarray))

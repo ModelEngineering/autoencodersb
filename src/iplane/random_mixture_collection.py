@@ -44,7 +44,6 @@ class PCollectionMixture(PCollectionContinuous):
         # Calculated
         self._std_point = np.array([])
         self._center_point = np.array([])
-        self.num_dimension = mean_arr.shape[1] if mean_arr.ndim == 2 else 0  # type: ignore
 
     @property
     def std_point(self) -> np.ndarray:

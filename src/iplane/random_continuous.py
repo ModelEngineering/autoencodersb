@@ -19,10 +19,10 @@ import itertools
 import pandas as pd  # type: ignore
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.integrate import simpson  # type: ignore
 from typing import Tuple, Optional, cast
 
-
-VariateResult = collections.namedtuple("VariateResult", ["variate_arr", "dx_arr"])
+MIN_NUM_DIMENSION_SAMPLE = 5  # Minimum number of samples per dimension for variate array generation
 
 
 ################################################
@@ -62,7 +62,7 @@ class DCollectionContinuous(DCollection):
             dx_arr=dx_arr,
             entropy=entropy,
         )
-        super().__init__(cn.DC_MIXTURE_NAMES, dct)
+        super().__init__(cn.DC_CONTINUOUS_NAMES, dct)
         self.actual_collection_dct = dct
         self.isAllValid()
 
@@ -77,16 +77,6 @@ class DCollectionContinuous(DCollection):
         if variate_arr.ndim == 1:
             raise ValueError("Variate array must be 2D.")
         return variate_arr.shape[1]
-
-    def __str__(self) -> str:
-        """
-        Returns a string representation of the DCollectionMixture object.
-        """
-        variate_arr, density_arr, dx_arr, entropy = self.getAll()
-        return (f"DCollectionContinuous(variate_arr={variate_arr}"
-                f"\ndensity_arr={density_arr}"
-                f"\ndx_arr={dx_arr}"
-                f"\nentropy={entropy})")
     
     def getAll(self) ->Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
         """
@@ -105,8 +95,9 @@ class RandomContinuous(Random):
 
     def __init__(self, pcollection: Optional[PCollection] = None,
             dcollection: Optional[DCollection] = None,
-            total_num_sample:int = cn.TOTAL_NUM_SAMPLE,
-            width_std:float = 4.0,
+            num_variate_sample:int = cn.NUM_VARIATE_SAMPLE,
+            axis_length_std:float = cn.AXIS_LENGTH_STD,
+            min_num_dimension_sample:int = MIN_NUM_DIMENSION_SAMPLE,
             **kwargs) -> None:
         """ Initializes the RandomContinuous object.
         Args:
@@ -116,59 +107,51 @@ class RandomContinuous(Random):
             width_std (float): Two sided width in standard deviations for the variate range.
         """
         super().__init__(pcollection=pcollection, dcollection=dcollection, **kwargs)
-        self.width_std = width_std
-        self.total_num_sample = total_num_sample
+        self.axis_length_std = axis_length_std
+        self.num_variate_sample = num_variate_sample
+        self.min_num_dimension_sample = min_num_dimension_sample
 
-    def makeVariate(self, min_point:np.ndarray, max_point:np.ndarray, num_sample:int) -> VariateResult:
+    def makeVariate(self, min_point:np.ndarray, max_point:np.ndarray, num_variate_sample:int
+                ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Generates the variate array for a continuous distribution.
 
         Args:
             min_point (np.ndarray): Minimum point for each dimension.
             max_point (np.ndarray): Maximum point for each dimension.
-            num_sample (int): Number of samples to generate.
+            num_variate_sample (int): Number of samples to generate for the variate array
 
         Returns:
             np.ndarray: The generated variate array.
         """
         #
         num_dimension = np.shape(min_point)[0]
-        # Construct the variate array
-        total_num_sample = self.total_num_sample
         # Calculate the number of samples for each dimension
-        num_dim_sample = int(total_num_sample**(1/num_dimension))
-        if num_dim_sample < 8:
-            msg = "Number of samples per dimension must be at least 8."
-            msg += f"\n  Increase max_num_sample so that 8**num_dimesion <= max_num_sample,"
+        num_dim_sample = int(num_variate_sample**(1/num_dimension))
+        if num_dim_sample < self.min_num_dimension_sample:
+            msg = f"Number of samples per dimension must be at least {self.min_num_dimension_sample}."
+            msg += f"\n  Increase max_num_sample so that {self.min_num_dimension_sample}**num_dimesion <= max_num_sample,"
             msg += f"\n  Currently:"
-            msg += f"\n    num_sample={num_sample}"
-            msg += f"\n    max_num_sample={self.total_num_sample}"
+            msg += f"\n    num_sample={num_variate_sample}"
+            msg += f"\n    max_num_sample={self.num_variate_sample}"
             msg += f"\n    num_dimension={num_dimension})."
             raise ValueError(msg)
         # Create linspace for each dimension
         linspaces:list = []
+        dxs:list = []
         for i_dim in range(num_dimension):
             linspace_arr = np.linspace(min_point[i_dim], max_point[i_dim], num=num_dim_sample).flatten()
             linspaces.append(linspace_arr)
+            dxs.append(np.mean(np.diff(linspace_arr)))
         variate_arr = np.array(list(itertools.product(*linspaces)))  # Create a grid of variates
         variate_arr = variate_arr.reshape(-1, num_dimension)  # Reshape to (num_sample, num_dimension)
-        dx_arr = np.array([np.mean(np.diff(variate_arr[:, i])) for i in range(num_dimension)])
+        dx_arr = np.array(dxs)
         #
-        return VariateResult(variate_arr=variate_arr, dx_arr=dx_arr)
-    
-    def predict(self, *args, **kwargs)->np.ndarray:
-        """
-        Predicts the probability density function (PDF) for a given array of variates using the Gaussian mixture model.
-
-        Returns:
-            np.ndarray: Array of predicted density values for each variate.
-        """
-        raise NotImplementedError("This method should be overridden by subclasses.")
+        return variate_arr, dx_arr
 
     def makeEntropy(self, density_arr:np.ndarray, dx_arr:np.ndarray) -> float:
         """
-        Numerical calculation of differential entropy for a continuous distribution. Using previously
-        construte
+        Numerical calculation of differential entropy for a continuous distribution.
 
         Args:
             density (np.ndarray): density array of the distribution.
@@ -177,5 +160,8 @@ class RandomContinuous(Random):
         Returns:
             float: differential entropy
         """
-        entropy = np.sum(density_arr * np.log2(density_arr + 1e-10) * dx_arr)
+        # Do the integration
+        dx = float(np.prod(dx_arr))
+        integrand = -density_arr*np.log2(density_arr + 1e-30)
+        entropy = np.sum(integrand) * dx
         return entropy

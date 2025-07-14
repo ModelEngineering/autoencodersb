@@ -32,7 +32,7 @@ class RandomDiscrete(Random):
             dcollection:Optional[DCollectionDiscrete]=None)->None:
         super().__init__(pcollection, dcollection)
 
-    def estimatePCollection(self, sample_arr:np.ndarray)-> PCollectionDiscrete:
+    def makePCollection(self, sample_arr:np.ndarray)-> PCollectionDiscrete:
         """Estimates the PCollectionDiscrete values from a categorical array.
 
         Args:

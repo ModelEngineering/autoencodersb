@@ -1,6 +1,7 @@
 import numpy as np
 NULL_ARR = np.array([])  # type: ignore
-TOTAL_NUM_SAMPLE = int(1e7)
+NUM_VARIATE_SAMPLE = int(1e7)
+AXIS_LENGTH_STD = 4  # Default length of an axis for a dimension in the variate_arr grid
 # Collections
 DC_DENSITY_ARR = 'density_arr'
 DC_DX_ARR = 'dx_arr'
@@ -13,10 +14,12 @@ PC_COVARIANCE_ARR = 'covariance_arr'
 PC_PROBABILITY_ARR = 'probability_arr'
 PC_WEIGHT_ARR = 'weight_arr'
 PC_TRAINING_ARR = 'training_arr'
+PC_KDE = 'kde'
 #
 PC_DISCRETE_NAMES = [PC_CATEGORY_ARR, PC_PROBABILITY_ARR]
 PC_MIXTURE_NAMES = [PC_MEAN_ARR, PC_COVARIANCE_ARR, PC_WEIGHT_ARR]
 PC_EMPIRICAL_NAMES = [PC_TRAINING_ARR]
+PC_KERNEL_NAMES = [PC_TRAINING_ARR, PC_KDE]
 #
 DC_DISCRETE_NAMES = [DC_ENTROPY, DC_VARIATE_ARR, DC_PROBABILITY_ARR]
 DC_CONTINUOUS_NAMES = [DC_ENTROPY, DC_VARIATE_ARR, DC_DENSITY_ARR, DC_DX_ARR]

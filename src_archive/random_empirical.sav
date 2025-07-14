@@ -40,7 +40,7 @@ class RandomEmpirical(RandomContinuous):
 
     def __init__(self, pcollection:Optional[PCollectionEmpirical]=None,
             dcollection:Optional[DCollectionEmpirical]=None,
-            total_num_sample:int=cn.TOTAL_NUM_SAMPLE,
+            total_num_sample:int=cn.NUM_VARIATE_SAMPLE,
             window_size:int=1)->None:
         super().__init__(pcollection, dcollection)
         self.total_num_sample = total_num_sample
@@ -71,7 +71,7 @@ class RandomEmpirical(RandomContinuous):
             self._max_point = cast(np.ndarray, np.max(sample_arr, axis=0))
         return self._max_point
 
-    def estimatePCollection(self, sample_arr:np.ndarray)-> PCollectionEmpirical:
+    def makePCollection(self, sample_arr:np.ndarray)-> PCollectionEmpirical:
         """Estimates the PCollectionEmpirical values from a categorical array.
 
         Args:
@@ -112,24 +112,23 @@ class RandomEmpirical(RandomContinuous):
         sample_arr = cast(np.ndarray, pcollection.get(cn.PC_TRAINING_ARR))
         if sample_arr.ndim != 2:
             raise ValueError(f"Expected 2D array, got {sample_arr.ndim}D array.")
-        # FIXME: Consider multiple dimensions and calculate dx_arr
-        if variate_arr is None
+        # Construct the variate and dx
+        if variate_arr is None:
             center_point = np.mean(sample_arr, axis=0)
             std_arr = np.std(sample_arr, axis=0)
-            min_point = center_point - self.width_std*std_arr
-            max_point = center_point + self.width_std*std_arr
-            variate_result = self.makeVariate(
+            min_point = center_point - self.axis_length_std*std_arr
+            max_point = center_point + self.axis_length_std*std_arr
+            variate_arr, dx_arr = self.makeVariate(
                 min_point=min_point,
                 max_point=max_point,
                 num_sample=self.total_num_sample
             )
-            variate_arr, dx_arr = variate_result.variate_arr, variate_result.dx_arr
         else:
             if dx_arr is None:
                 raise ValueError("dx_arr must be provided if variate_arr is provided.")
         # Use interpolate to construct the density from the empirical distribution
         initial_dcollection = DCollectionEmpirical(
-            variate_arr=sorted_sample_arr[:len(density_arr)],
+            variate_arr=variate_arr,
             density_arr=density_arr,
             dx_arr=np.array([dx_arr])
         )

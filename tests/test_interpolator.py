@@ -126,7 +126,7 @@ class TestInterpolator(unittest.TestCase):
         random_mixture = RandomMixture()
         random_empirical = RandomEmpirical()
         sample_arr = random_mixture.generateSample(pcollection, num_sample=NUM_SAMPLE)
-        _ = random_empirical.estimatePCollection(sample_arr)
+        _ = random_empirical.makePCollection(sample_arr)
         cdf = random_empirical.makeCDF(sample_arr)
         variate_arr = cdf.variate_arr
         cdf_arr = cdf.cdf_arr

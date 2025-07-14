@@ -73,7 +73,7 @@ class TestRandomMixture(unittest.TestCase):
         random = RandomMixture(num_component=NUM_COMPONENT, random_state=42)
         sample_arr = self.makeMixture(num_dim=NUM_DIM, num_component=NUM_COMPONENT, variance=VARIANCE,
                 component_sample_size=10000)
-        pcollection = random.estimatePCollection(sample_arr)
+        pcollection = random.makePCollection(sample_arr)
         _, covariance_arr, _ = pcollection.getAll()
         flat_covariances = np.array(covariance_arr).flatten()
         trues = np.isclose(np.abs(flat_covariances), VARIANCE, atol=0.5)
@@ -90,7 +90,7 @@ class TestRandomMixture(unittest.TestCase):
             random = RandomMixture(num_component=NUM_COMPONENT, random_state=42)
             sample_arr = self.makeMixture(num_dim=NUM_DIM, num_component=NUM_COMPONENT, variance=VARIANCE,
                     covariance=COVARIANCE, component_sample_size=10000)
-            pcollection = random.estimatePCollection(sample_arr)
+            pcollection = random.makePCollection(sample_arr)
             _, covariance_arr, __ = pcollection.getAll()
             flat_covariances = np.abs(np.array(covariance_arr).flatten())
             frac = np.mean(np.isclose(np.abs(flat_covariances), VARIANCE, atol=0.2))
@@ -241,7 +241,7 @@ class TestRandomMixture(unittest.TestCase):
         num_component = 2
         sample_arr = self.makeMixture(num_dim=5, num_component=num_component, variance=0.1,
                 component_sample_size=100000)
-        pcollection = self.random.estimatePCollection(sample_arr)
+        pcollection = self.random.makePCollection(sample_arr)
         expected_entropy = self.random.calculateEntropy(pcollection)
         dcollection = self.random.makeDCollection(pcollection=pcollection)
         # Use a big delta on comparison because of the "roughness" of assuming non-overlapping distributions of components
