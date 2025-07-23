@@ -15,7 +15,7 @@ NUM_SAMPLE = 1000
 class TestRandomMixture(unittest.TestCase):
 
     def setUp(self):
-        self.random = RandomMixture(total_num_sample=int(1e6), random_state=42)
+        self.random = RandomMixture(num_variate_sample=int(1e6), random_state=42)
 
     def makeMixture(self,
             num_component:int=2,
@@ -106,8 +106,8 @@ class TestRandomMixture(unittest.TestCase):
     def testMakeDistribution1Component1Dimension(self):
         if IGNORE_TESTS:
             return
-        MEAN_ARR = np.array([[5]])
-        COVARIANCE_ARR = np.array([[[0.5]]])
+        MEAN_ARR = np.array([[100]])
+        COVARIANCE_ARR = np.array([[[1]]])
         pcollection = PCollectionMixture(
             mean_arr=MEAN_ARR,
             covariance_arr=COVARIANCE_ARR,

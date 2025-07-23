@@ -2,15 +2,10 @@
 import iplane.constants as cn  # type: ignore
 from iplane.random_continuous import RandomContinuous, PCollectionContinuous, DCollectionContinuous # type: ignore
 
-import itertools
 from scipy.stats import gaussian_kde  # type: ignore
-import pandas as pd  # type: ignore
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats import multivariate_normal # type: ignore
-from sklearn.mixture import GaussianKernel  # type: ignore
-from typing import Union, Optional, cast
-import warnings
+from typing import Optional, cast
 
 ###############################################
 class PCollectionKernel(PCollectionContinuous):
@@ -24,6 +19,7 @@ class PCollectionKernel(PCollectionContinuous):
         super().__init__(cn.PC_KERNEL_NAMES, dict(training_arr=training_arr, kde=kde))
         self.isValid()
 
+    @property
     def num_dimension(self) -> int:
         """
         Returns:
@@ -45,20 +41,17 @@ class RandomKernel(RandomContinuous):
     """Handles Gaussian Kernel Models."""
 
     def __init__(self,
-            pcollection:Optional[PCollectionContinuous]=None,
-            dcollection:Optional[DCollectionContinuous]=None,
             num_variate_sample:int = cn.NUM_VARIATE_SAMPLE,
+            **kwargs
             ):
         """
         Initializes the KernelEntropy object.
         Args:
-            pcollection (PCollectionKernel): collection of parameters for the Gaussian mixture model.
-            dcollection (DCollectionKernel): collection of distribution properties.
             num_variate_sample (int): total number of samples to generate.
             num_component (int): number of components in the mixture model.
             random_state (int): random state for reproducibility.
         """
-        super().__init__(pcollection, dcollection)
+        super().__init__(**kwargs)
         self.num_variate_sample = num_variate_sample
         # Use k-means clustering to initialize the Gaussian Kernel Model
 
@@ -99,8 +92,8 @@ class RandomKernel(RandomContinuous):
         # Construct the the variate and dx
         std_arr = np.std(training_arr, axis=0)
         mean_arr = np.mean(training_arr)
-        min_point = mean_arr - self.axis_length_std*std_arr
-        max_point = mean_arr + self.axis_length_std*std_arr
+        min_point = mean_arr - 0.5*self.axis_length_std*std_arr
+        max_point = mean_arr + 0.5*self.axis_length_std*std_arr
         variate_arr, dx_arr = self.makeVariate(min_point, max_point, self.num_variate_sample)
         # Estimate the density and entropy
         density_arr = self.predict(variate_arr, pcollection)
@@ -133,8 +126,8 @@ class RandomKernel(RandomContinuous):
             pcollection = cast(PCollectionKernel, self.pcollection)
         # Initializations
         kde = pcollection.get(cn.PC_KDE)
-        density_arr = kde(small_variate_arr)
-        return np.array([density_arr])
+        density_arr = kde(small_variate_arr.T)
+        return density_arr
 
     def makePCollection(self, sample_arr:np.ndarray)->PCollectionKernel:
         """
@@ -152,7 +145,7 @@ class RandomKernel(RandomContinuous):
         if sample_arr.ndim != 2:
             raise ValueError("sample_arr must be 2d.")
         #
-        kde = gaussian_kde(sample_arr, bw_method='silverman')
+        kde = gaussian_kde(sample_arr.T, bw_method='silverman')
         #
         self.pcollection = PCollectionKernel(
             training_arr=sample_arr,

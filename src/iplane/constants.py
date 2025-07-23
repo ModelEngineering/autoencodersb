@@ -1,7 +1,7 @@
 import numpy as np
 NULL_ARR = np.array([])  # type: ignore
 NUM_VARIATE_SAMPLE = int(1e7)
-AXIS_LENGTH_STD = 4  # Default length of an axis for a dimension in the variate_arr grid
+AXIS_LENGTH_STD = 8  # Default length of an axis for a dimension in the variate_arr grid
 # Collections
 DC_DENSITY_ARR = 'density_arr'
 DC_DX_ARR = 'dx_arr'

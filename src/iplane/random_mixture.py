@@ -105,7 +105,7 @@ class RandomMixture(RandomContinuous):
             density = mvn.pdf(small_variate_arr)
             densities.append(weight*density)
         density_arr = np.sum(densities, axis=0)  # Sum the PDFs of all components
-        return np.array([density_arr])
+        return density_arr
 
     def calculateEntropy(self, collection:PCollectionMixture) -> float:
         """
@@ -201,7 +201,7 @@ class RandomMixture(RandomContinuous):
         # Calculate the densities at each variate value
         density_arr = self.predict(variate_arr, dx_arr, pcollection=pcollection)
         # Calculate entropy
-        entropy = self.makeEntropy(density_arr= density_arr, dx_arr=cast(np.ndarray, dx_arr))
+        entropy = self.makeEntropy(density_arr=density_arr, dx_arr=cast(np.ndarray, dx_arr))
         # Construct the DCollectionMixture object
         self.dcollection = DCollectionMixture(
             variate_arr=variate_arr,

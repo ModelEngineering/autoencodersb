@@ -115,7 +115,7 @@ class DCollection(Collection):
 class Random(object):
 
     def __init__(self, pcollection:Optional[Any]=None,
-            dcollection:Optional[Any]=None, **kwargs) -> None:
+            dcollection:Optional[Any]=None) -> None:
         self.pcollection = pcollection
         self.dcollection = dcollection
 

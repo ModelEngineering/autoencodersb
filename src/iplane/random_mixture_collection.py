@@ -27,9 +27,9 @@ class PCollectionMixture(PCollectionContinuous):
     #   weight_arr: C, weight of each Gaussian component, sum(weight_arr) =
 
     def __init__(self,
-                mean_arr:Optional[np.ndarray]=None,
-                covariance_arr:Optional[np.ndarray]=None,
-                weight_arr:Optional[np.ndarray]=None)->None:
+                mean_arr:np.ndarray=np.array([[100]]),
+                covariance_arr:np.ndarray=np.array([[[1]]]),
+                weight_arr:np.ndarray=np.array([1.0]))->None:
         """
         Args:
             parameter_dct (Optional[Dict[str, Any]], optional): parameter name-value pairs.
@@ -113,7 +113,7 @@ class PCollectionMixture(PCollectionContinuous):
             is_correct_shape = True
         if not is_correct_shape:
             import pdb; pdb.set_trace()
-            raise ValueError("Either mean_arr must be 2D and covariance_arr must be 3D, or both must be 1D.")
+            raise ValueError("mean_arr must be 2D and covariance_arr must be 3D.")
         num_component = mean_arr.shape[0]
         num_dimension = mean_arr.shape[1] if mean_arr.ndim == 2 else 1
         if not np.all([mean_arr.shape[0], covariance_arr.shape[0], weight_arr.shape[0]] == [num_component] * 3):

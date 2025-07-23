@@ -93,23 +93,21 @@ class DCollectionContinuous(DCollection):
 class RandomContinuous(Random):
     """Abstract class for random continuous distributions."""
 
-    def __init__(self, pcollection: Optional[PCollection] = None,
-            dcollection: Optional[DCollection] = None,
+    def __init__(self,
             num_variate_sample:int = cn.NUM_VARIATE_SAMPLE,
             axis_length_std:float = cn.AXIS_LENGTH_STD,
-            min_num_dimension_sample:int = MIN_NUM_DIMENSION_SAMPLE,
+            min_num_dimension_coordinate:int = MIN_NUM_DIMENSION_SAMPLE,
             **kwargs) -> None:
         """ Initializes the RandomContinuous object.
         Args:
-            pcollection (Optional[PCollection]): The collection of parameters for the distribution.
-            dcollection (Optional[DCollection]): The collection of distributions.
-            total_num_sample (int): Total number of samples to generate.
-            width_std (float): Two sided width in standard deviations for the variate range.
+            num_variate_sample (int): number of samples to generate for the variate array
+            axis_length_std (float) length of each axis of variate_arr in units of std
+            min_num_dimension_sample (int): Mininum number of coordinate for each dimension
         """
-        super().__init__(pcollection=pcollection, dcollection=dcollection, **kwargs)
+        super().__init__(**kwargs)
         self.axis_length_std = axis_length_std
         self.num_variate_sample = num_variate_sample
-        self.min_num_dimension_sample = min_num_dimension_sample
+        self.min_num_dimension_coordinate = min_num_dimension_coordinate
 
     def makeVariate(self, min_point:np.ndarray, max_point:np.ndarray, num_variate_sample:int
                 ) -> Tuple[np.ndarray, np.ndarray]:
@@ -128,9 +126,9 @@ class RandomContinuous(Random):
         num_dimension = np.shape(min_point)[0]
         # Calculate the number of samples for each dimension
         num_dim_sample = int(num_variate_sample**(1/num_dimension))
-        if num_dim_sample < self.min_num_dimension_sample:
-            msg = f"Number of samples per dimension must be at least {self.min_num_dimension_sample}."
-            msg += f"\n  Increase max_num_sample so that {self.min_num_dimension_sample}**num_dimesion <= max_num_sample,"
+        if num_dim_sample < self.min_num_dimension_coordinate:
+            msg = f"Number of samples per dimension must be at least {self.min_num_dimension_coordinate}."
+            msg += f"\n  Increase max_num_sample so that {self.min_num_dimension_coordinate}**num_dimesion <= max_num_sample,"
             msg += f"\n  Currently:"
             msg += f"\n    num_sample={num_variate_sample}"
             msg += f"\n    max_num_sample={self.num_variate_sample}"
