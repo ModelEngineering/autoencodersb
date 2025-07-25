@@ -1,4 +1,4 @@
-'''Interpolation for multivariate functions.'''
+'''Interpolation for scalar functions of multiple variables.'''
 import iplane.constants as cn
 from iplane.random import Random, PCollection, DCollection  # type: ignore
 
@@ -12,6 +12,7 @@ from typing import Tuple, Any, Optional, Dict, List, cast
 """
 Notation:
     N - number of samples (first dimension of the variate_arr, sample_arr)
+    M - number of points
     D - number of variate dimensions (second dimension of the variate_arr)
 """
 class Interpolator(object):
@@ -23,16 +24,17 @@ class Interpolator(object):
         """
         Multivariate interpolator for empirical distributions. A point is a vector in the variate space.
             N - number of samples
-            D - number of variate dimensions
+            D - number of variate (point) dimensions
         Args:
             variate_arr (np.ndarray N X D)
-            sample_arr (np.ndarray N X ?)
+            sample_arr (np.ndarray N X 1)
             is_normalize (bool, optional): normalize values of the variate_arr by dividing by standard deviation.
             max_distance (float, optional): maximum distance between a variate_arr entry and points to be estimated
             max_size_interpolation_set (int, optional): _description_. Defaults to 5.
         """
+        self._checkArray(variate_arr)
         self.variate_arr = np.array(variate_arr, dtype=float)
-        self.sample_arr = np.array(sample_arr, dtype=float)
+        self.sample_arr = np.array(sample_arr, dtype=float).reshape(-1)
         self.num_sample = self.variate_arr.shape[0]
         self.num_variate_dimension = self.variate_arr.shape[1]
         self.is_normalize = is_normalize
@@ -98,16 +100,29 @@ class Interpolator(object):
             idx = -1
         return idx, distance
     
+
     def predict(self, point_arr:np.ndarray) -> np.ndarray:
-        """Estimates the value from the sample_arr.
+        """Uses nearest variates to estimate the value in the sample_arr space.
 
         Args:
-            point_arr (np.ndarray): Variate to estimate the probability for.
-                It is a 1D array of variates, e.g. [x1, x2, ..., xD] for D dimensions.
-                Result is np.nan if no variates are found within the max_distance
+            point_arr (np.ndarray M X D): Variate to estimate the probability for.
 
         Returns:
-            np.ndarray: Value in the sample_arr space
+            np.ndarray: Values corresponding to each point in point_arr
+        """
+        self._checkArray(point_arr)
+        #
+        results = [self.predictOne(p) for p in point_arr]
+        return np.array(results, dtype=float).reshape(-1)
+    
+    def predictOne(self, point:np.ndarray) -> float:
+        """Uses nearest variates to estimate the value in the sample_arr space.
+
+        Args:
+            point_arr (np.ndarray D): Variate to estimate the probability for.
+
+        Returns:
+            np.ndarray: Values corresponding to each point in point_arr
         """
         # Initializations
         exclude_idxs:list = []
@@ -115,19 +130,24 @@ class Interpolator(object):
         predictions:list = []
         # Iteratively find estimates
         for _ in range(self.size_interpolation_set):
-            idx, distance = self._getIndexNearestVariate(point_arr, exclude_idxs)
+            idx, distance = self._getIndexNearestVariate(point, exclude_idxs)
             if idx < 0:
                 break
             predictions.append(self.sample_arr[idx])
             distances.append(distance)
             exclude_idxs.append(idx)
         if len(predictions) == 0:
-            result_arr = np.repeat(np.nan, self.num_variate_dimension)
+            result = np.nan
         else:
             weight_arr = np.array(distances, dtype=float)
             weight_arr = 1 / (weight_arr + 1e-8)  # Avoid division by zero
             prediction_arr = np.array(predictions, dtype=float)
-            result_arr = np.sum(weight_arr * prediction_arr, axis=0) / np.sum(weight_arr)
-            if isinstance(result_arr, float):
-                result_arr = np.array([result_arr])
-        return result_arr
+            result = np.sum(weight_arr * prediction_arr, axis=0) / np.sum(weight_arr)
+        return result
+    
+    def _checkArray(self, arr):
+        """Checks if the array is a numpy array and has the correct dimensions."""
+        if not isinstance(arr, np.ndarray):
+            raise ValueError("Expected a numpy array.")
+        if arr.ndim != 2:
+            raise ValueError(f"Expected a 2D array, got {arr.ndim}D array.")

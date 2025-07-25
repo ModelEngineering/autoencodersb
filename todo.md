@@ -1,4 +1,9 @@
 # TASKS
+# Generate samples from an empirical distribution
+1. Construct a sample DAG from the sample data. That is, $x_1 \leq x_2$ if and only if $x_{1i} \leq x_{2i}$ for all $i$.
+2. Interpolating over the sample DAG allows an estimate of the CDF. We call this $\hat{f} (x)$.
+3. To find a sample vector for a CDF of $c$, use scipy.minimize to find $x$ such that $(\hat{f}(x) -c)^2$ is minimized. 
+4. Can evaluate the quality of the generated data by looking at divergence of the distributions.
 # Clean up existing code
 * RandomContinuous: variate\_arr, dx\_arr, density\_arr
 * Has predict method that estimates density for N X M array of points

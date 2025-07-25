@@ -31,7 +31,7 @@ class RandomMixture(RandomContinuous):
             num_component (int): number of components in the mixture model.
             random_state (int): random state for reproducibility.
         """
-        super().__init__(pcollection, dcollection, **kwargs)
+        super().__init__(pcollection=pcollection, dcollection=dcollection, **kwargs)
         self.num_component = num_component
         self.random_state = random_state
         # Use k-means clustering to initialize the Gaussian Mixture Model

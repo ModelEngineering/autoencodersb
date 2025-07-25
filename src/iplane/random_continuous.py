@@ -30,12 +30,6 @@ class PCollectionContinuous(PCollection):
 
     def __init__(self, *args, **kwargs) -> None:
         # Parameter collection for continuous random variables.
-        #   C: number of components
-        #   N: number of samples
-        #   D: number of dimensions
-        #   mean_arr: C X D
-        #   covariance_arr: C X D X D
-        #   weight_arr: C
         super().__init__(*args, **kwargs)
     pass
 

@@ -2,10 +2,12 @@
 import iplane.constants as cn  # type: ignore
 from iplane.random_continuous import RandomContinuous, PCollectionContinuous, DCollectionContinuous # type: ignore
 
-from scipy.stats import gaussian_kde  # type: ignore
 import numpy as np
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt # type: ignore
+from scipy.stats import gaussian_kde  # type: ignore
+from scipy.optimize import minimize # type: ignore
 from typing import Optional, cast
+
 
 ###############################################
 class PCollectionKernel(PCollectionContinuous):
@@ -55,6 +57,136 @@ class RandomKernel(RandomContinuous):
         self.num_variate_sample = num_variate_sample
         # Use k-means clustering to initialize the Gaussian Kernel Model
 
+    def deprecated_findVariate(self, cdf:cn.CDF, cdf_val:float)-> np.ndarray:
+        """
+        Finds a variate whose CDF is close to the given CDF value.
+
+        Args:
+            cdf (CDF): The cumulative distribution function.
+            cdv_val (float): The CDF value to find the corresponding variate for.
+
+        Returns:
+            np.ndarray: The variate (point) or np.array([np.nan])
+        """
+        ##
+        def evaluatePoint(point:np.ndarray, cdf_val:float) -> float:
+            """
+            Evaluates the difference between the CDF value and the given CDF value.
+
+            Args:
+                point (np.ndarray): The point to evaluate.
+                cdf_val (float): The CDF value to compare against.
+
+            Returns:
+                float: The absolute difference.
+            """
+            #estimated_cdf_val = interpolator.predictOne(point)
+            trues = np.all(cdf.variate_arr <= point, axis=1)
+            estimated_cdf_val = np.mean(trues)
+            #print(point, estimated_cdf_val, cdf_val)
+            return estimated_cdf_val - cdf_val
+        ##
+        num_iter = 1000
+        std_incr = 0.1 # Amount by which points are changed in std increments
+        # Characteristics of the variate
+        std_arr = np.std(cdf.variate_arr, axis=0)
+        # Search for the best fitting variate
+        random_idx = np.random.randint(0, cdf.variate_arr.shape[0])
+        point_estimate = np.array([np.nan])
+        point = cdf.variate_arr[random_idx]
+        #result = minimize(fun=evaluatePoint, x0=x0, args=(cdf_val,), method='Nelder-Mead',
+        #            options=dict(maxiter=1000), tol=1e-2)
+        point_estimate = np.array([np.nan])
+        is_last_increase = None
+        is_flip = False
+        last_estimation_error = 0
+        for _ in range(num_iter):
+            estimation_error = evaluatePoint(point, cdf_val)
+            if np.abs(estimation_error) < 1e-2:
+                point_estimate = point
+                import pdb; pdb.set_trace()  # Debugging breakpoint
+                break
+            print(estimation_error, point)
+            if estimation_error < 0:
+                # If the estimation error is negative, we need to increase the point
+                point += std_incr * std_arr
+                if is_last_increase == False:
+                    if is_flip:
+                        point_estimate = point
+                        break
+                    is_flip = True
+                else:
+                    is_flip = False
+                is_last_increase = True
+            else:
+                # If the estimation error is positive, we need to decrease the point
+                point -= std_incr * std_arr
+                if is_last_increase == True:
+                    if is_flip:
+                        point_estimate = point
+                        break
+                    is_flip = True
+                else:
+                    is_flip = False
+                is_last_increase = False
+        #
+        return point_estimate
+
+    @staticmethod
+    def calculateCDFValue(point, sample_arr:np.ndarray) -> float:
+        """
+        Calculates the cumulative distribution function (CDF) for a given point and sample array.
+
+        Args:
+            point (np.ndarray): The point at which to evaluate the CDF.
+            sample_arr (np.ndarray): The array of samples used to estimate the CDF.
+
+        Returns:
+            float:
+        """
+        # Compute the CDF using the empirical distribution
+        trues = sample_arr <= point
+        estimate = np.mean(np.sum(trues, axis=1) == sample_arr.shape[1])
+        return estimate
+
+    def _findVariate(self, cdf:cn.CDF, cdf_val:float)-> np.ndarray:
+        """
+        Finds a variate whose CDF is close to the given CDF value.
+
+        Args:
+            cdf (CDF): The cumulative distribution function.
+            cdv_val (float): The CDF value to find the corresponding variate for.
+
+        Returns:
+            np.ndarray: The variate (point) or np.array([np.nan])
+        """
+        ##
+        def evaluatePoint(point:np.ndarray) -> float:
+            """
+            Evaluates the difference between the CDF value and the given CDF value.
+
+            Args:
+                point (np.ndarray): The point to evaluate.
+                cdf_val (float): The CDF value to compare against.
+
+            Returns:
+                float: The absolute difference.
+            """
+            estimate_error = (self.calculateCDFValue(point, cdf.variate_arr) - cdf_val)**2
+            return estimate_error
+        ##
+        results:list = []
+        for _ in range(100):
+            random_idx = np.random.randint(0, cdf.variate_arr.shape[0])
+            point = cdf.variate_arr[random_idx]
+            result = minimize(fun=evaluatePoint, x0=point, method='BFGS')
+            if evaluatePoint(result.x) < 1e-2:
+                return result.x
+            results.append(result)
+        # Find the best result
+        results.sort(key=lambda r: evaluatePoint(r.x))
+        return results[0].x
+
     def generateSample(self, pcollection:PCollectionKernel, num_sample:int) -> np.ndarray:
         """
         Generates synthetic data for a multidimensional Gaussian Kernel Model.
@@ -71,7 +203,10 @@ class RandomKernel(RandomContinuous):
         Returns:
             np.array (num_sample, 1), int. total count is = sum(num_samples)
         """
-        raise NotImplementedError("This method is not implemented for RandomKernel.")
+        cdf = self.makeCDF(pcollection.get(cn.PC_TRAINING_ARR))
+        uniform_arr = np.random.uniform(0, 1, num_sample)
+        sample_arr = np.array([self._findVariate(cdf, v) for v in uniform_arr])
+        return sample_arr
     
     def makeDCollection(self, variate_arr:Optional[np.ndarray]=None,
             pcollection:Optional[PCollectionKernel]=None) -> DCollectionKernel:
@@ -87,7 +222,13 @@ class RandomKernel(RandomContinuous):
             DistributionCollectionMGaussian: The distribution object containing the variate array, PDF array, dx array, and entropy.
         """
         # Initializations
+        if self.pcollection is None:
+            if pcollection is None:
+                raise ValueError("PCollection has not been estimated yet.")
+            else:
+                self.pcollection = pcollection
         pcollection = cast(PCollectionKernel, self.setPCollection(pcollection))
+        #
         training_arr = cast(np.ndarray, pcollection.get(cn.PC_TRAINING_ARR))
         # Construct the the variate and dx
         std_arr = np.std(training_arr, axis=0)
@@ -109,7 +250,7 @@ class RandomKernel(RandomContinuous):
     def predict(self, small_variate_arr:np.ndarray,
                 pcollection:Optional[PCollectionKernel]=None) -> np.ndarray:
         """
-        Predicts the probability density function (PDF) for a given array of variates using the Gaussian Kernel Model.
+        Predicts the probability density for an a collection of variates (points) using the empirical distribution.
 
         Args:
             small_variate_arr (np.ndarray): Single variate array of shape (1, num_dimension).
@@ -152,3 +293,75 @@ class RandomKernel(RandomContinuous):
             kde=kde
         )
         return self.pcollection
+    
+    def makeCDF(self, sample_arr:np.ndarray) -> cn.CDF:
+        """Constructs a CDF from a two dimensional array of variates. Rows are instances; columns are variables.
+        The CDF is constructed from the sample directed acyclic graph (DAG) of variates. The verticies
+        of the DAG are elements (points) of sample_arr. An arc is drawn from a point A to a point B if A is less than or equal to B,
+        and there is no point C such that A < C < B. The CDF is constructed by counting the number of points
+        that are less than or equal to each point in sample_arr. The sample DAG is not explicitly constructed,
+        but the CDF is constructed by counting the number of points that are less than or equal to each point in sample_arr.
+        
+
+        Args:
+            sample_arr (np.ndarray) (N X D): An array of points, each of which is a D-dimensional array.
+
+        Returns:
+            CDF
+                variate_arr (N X D)
+                cdf_arr (N): CDF corresponding to the variate_arr
+        """
+        if sample_arr.ndim != 2:
+            raise ValueError(f"Expected 2D array, got {sample_arr.ndim}D array.")
+        #
+        min_point = np.min(sample_arr, axis=0)
+        max_point = np.max(sample_arr, axis=0)
+        cdfs:list = []
+        num_sample = sample_arr.shape[0]
+        num_variable = sample_arr.shape[1]
+        #
+        for point in sample_arr:
+            less_than_arr = sample_arr <= point
+            less_satisfies_arr = np.sum(less_than_arr, axis=1) == num_variable
+            count_less = np.sum(less_satisfies_arr) - 1
+            cdf_val = count_less/num_sample
+            cdfs.append(cdf_val)
+        # Ensure that there is a minimum point
+        if 1 in cdfs:
+            idx = cdfs.index(1)
+            min_point = sample_arr[idx]
+            full_variate_arr = sample_arr
+        else:
+            cdfs.append(0)
+            full_variate_arr = np.vstack([sample_arr, np.array([min_point])])
+        # Ensure that there is a maximum point
+        num_sample = full_variate_arr.shape[0]
+        if num_sample in cdfs:
+            idx = cdfs.index(num_sample)
+            max_point = sample_arr[idx]
+            full_variate_arr = sample_arr
+        else:
+            cdfs.append(1)
+            full_variate_arr = np.vstack([full_variate_arr, np.array([max_point])])
+        # Complete the cdf calculations
+        cdf_arr = np.array(cdfs, dtype=float)
+        #distance_arr = np.sqrt(np.sum(full_variate_arr**2, axis=1))
+        #
+        return cn.CDF(variate_arr=full_variate_arr, cdf_arr=cdf_arr, variate_min=min_point, variate_max=max_point)
+    
+    @classmethod
+    def estimateEntropy(cls, sample_arr:np.ndarray, num_variate_sample:int) -> float:
+        """
+        Estimates the differential entropy for sample data using the kernel density estimation method.
+
+        Args:
+            sample_arr (np.ndarray): Array of samples to estimate the entropy from.
+            num_variate_sample (int): Number of variates to sample from the distribution.
+
+        Returns:
+            float: Estimated differential entropy.
+        """
+        random_kernel = cls(num_variate_sample=num_variate_sample)
+        pcollection = random_kernel.makePCollection(sample_arr)
+        dcollection = random_kernel.makeDCollection(pcollection=pcollection)
+        return dcollection.get(cn.DC_ENTROPY)

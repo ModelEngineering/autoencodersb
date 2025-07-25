@@ -1,4 +1,7 @@
+from collections import namedtuple
 import numpy as np
+
+
 NULL_ARR = np.array([])  # type: ignore
 NUM_VARIATE_SAMPLE = int(1e7)
 AXIS_LENGTH_STD = 8  # Default length of an axis for a dimension in the variate_arr grid
@@ -25,3 +28,6 @@ DC_DISCRETE_NAMES = [DC_ENTROPY, DC_VARIATE_ARR, DC_PROBABILITY_ARR]
 DC_CONTINUOUS_NAMES = [DC_ENTROPY, DC_VARIATE_ARR, DC_DENSITY_ARR, DC_DX_ARR]
 DC_MIXTURE_NAMES = list(DC_CONTINUOUS_NAMES)
 DC_EMPIRICAL_NAMES = list(DC_MIXTURE_NAMES)
+
+######## CLASSES ########
+CDF = namedtuple('CDF', ['variate_arr', 'cdf_arr', 'variate_min', 'variate_max'])
