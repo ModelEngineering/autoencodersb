@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import multivariate_normal # type: ignore
 from sklearn.mixture import GaussianMixture  # type: ignore
-from typing import Optional, cast
+from typing import Optional, cast, List
 import warnings
 
 
@@ -183,8 +183,13 @@ class RandomMixture(RandomContinuous):
         Returns:
             DistributionCollectionMGaussian: The distribution object containing the variate array, PDF array, dx array, and entropy.
         """
+        if pcollection is None:
+            if self.pcollection is not None:
+                pcollection = self.pcollection
+            else:
+                raise ValueError("PCollection must be provided.")
         # Initializations
-        mean_arr, covariance_arr, weight_arr = pcollection.getAll()
+        mean_arr, covariance_arr, _ = pcollection.getAll()
         shape = pcollection.getShape()
         num_component, num_dimension = shape.num_component, shape.num_dimension
         # Construct the variate array
@@ -210,3 +215,33 @@ class RandomMixture(RandomContinuous):
             entropy=entropy,
         )
         return self.dcollection
+    
+    def makeMarginal(self, dimensions:List[int]) -> 'RandomMixture':
+        """
+        Create a marginal distribution by selecting specific dimensions from the PCollection.
+
+        Args:
+            dimensions (List[int]): List of dimensions to include in the marginal distribution.
+
+        Returns:
+            RandomKernel: A new instance of RandomKernel with the specified dimensions.
+        """
+        if self.pcollection is None:
+            import pdb; pdb.set_trace()
+            raise ValueError("PCollection has not been estimated yet.")
+        if any([d > self.pcollection.getShape().num_dimension for d in dimensions]):
+            raise ValueError(f"Dimensions {dimensions} exceed the number of dimensions in the PCollection.")
+        # Extract the marginal parameters
+        covariance_arr = self.pcollection.get(cn.PC_COVARIANCE_ARR)
+        mean_arr = self.pcollection.get(cn.PC_MEAN_ARR)
+        marginal_covariance_arr = covariance_arr[:, dimensions, :][:, :, dimensions]
+        marginal_mean_arr = mean_arr[:, dimensions]
+        marginal_pcollection = PCollectionMixture(
+            mean_arr=marginal_mean_arr,
+            covariance_arr=marginal_covariance_arr,
+            weight_arr=self.pcollection.get(cn.PC_WEIGHT_ARR)
+        )
+        marginal_dcollection = self.makeDCollection(pcollection=marginal_pcollection)
+        # Create a new RandomMixture instance with the marginal parameters
+        return RandomMixture(num_variate_sample=self.num_variate_sample, pcollection=marginal_pcollection,
+                dcollection=marginal_dcollection)

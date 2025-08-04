@@ -1,5 +1,4 @@
-from iplane.mixture_entropy import MixtureEntropy  # type: ignore
-
+import collections
 import torch.nn as nn
 import torch
 import torch.optim as optim
@@ -8,7 +7,11 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split  # type: ignore
 from sklearn.mixture import GaussianMixture # type: ignore
 from scipy.special import logsumexp # type: ignore
-from typing_extensions import LiteralString
+from typing_extensions import LiteralString, List, Dict
+from sklearn.feature_selection import mutual_info_regression # type: ignore
+from iplane.random_kernel import RandomKernel
+
+InformationPlane = collections.namedtuple("InformationPlane", ['IXT', 'IYT'])
 
 # --- 1. Synthetic Data Generation ---
 def generate_synthetic_data(num_samples, slope, intercept, noise_std, classification_threshold):
@@ -209,17 +212,30 @@ def estimate_mi_discrete_continuous_gmm(discrete_var, continuous_var, n_componen
     I_YT = max(0, I_YT) # Mutual information must be non-negative
     return I_YT
 
+def jiggleArray(arr:np.ndarray, noise_level:float=0.01) -> np.ndarray:
+    """
+    Adds small random noise to each element of the array.
+    Useful for avoiding exact duplicates in MI estimation.
+    """
+    if arr.ndim == 1:
+        arr = arr.reshape(-1, 1)  # Ensure 2D for consistent noise addition
+    noise = np.random.uniform(-noise_level, noise_level, arr.shape)
+    return arr + noise
 
+# Trajectory of MI may depend on the problem. Consider
+#    1. Threshold
+#    2. odd even
+#    3. Randomly chosen samples
 # --- Main Execution ---
 if __name__ == "__main__":
     # Parameters
     num_samples = 5000 # Increased samples for better GMM fitting
     input_dim = 1
-    hidden_dims = [64, 32] # Keep hidden layers smaller for faster GMM fitting
+    hidden_dims = [4, 4 ] # Keep hidden layers smaller for faster GMM fitting
     output_dim = 1
     learning_rate = 0.01
-    epochs = 1000
-    batch_size = 64
+    epochs = 500
+    batch_size = 100
 
     # GMM MI parameters
     num_gmm_components = 3 # Number of components for each GMM
@@ -229,7 +245,7 @@ if __name__ == "__main__":
     gmm_random_state = 42
 
     # Generate data
-    X_tensor, Y_tensor, X_np, Y_np_binary = generate_synthetic_data(num_samples, slope=5, intercept=1, noise_std=0.8, classification_threshold=3.5)
+    X_tensor, Y_tensor, X_np, Y_np_binary = generate_synthetic_data(num_samples, slope=5, intercept=1, noise_std=0.1, classification_threshold=3.5)
 
     # Corrected line: Unpack all 8 values returned by train_test_split
     X_train, X_test, Y_train, Y_test, X_np_train, X_np_test, Y_np_binary_train, Y_np_binary_test = train_test_split(
@@ -242,15 +258,18 @@ if __name__ == "__main__":
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     # Store MI values for plotting
-    information_plane_data = {f'hidden_{i}': {'IXT': [], 'IYT': []} for i in range(len(hidden_dims))}
+    information_plane_dct:Dict[str, InformationPlane] = {}
+    #information_plane_data:dict = {f'hidden_{i}': {'IXT': [], 'IYT': []} for i in range(len(hidden_dims))}
 
     print("Starting training and information plane tracking (GMM-based MI with sklearn)...")
 
+    loss = None
     for epoch in range(epochs):
         # Mini-batch training
         permutation = torch.randperm(X_train.size(0))
-        for i in range(0, X_train.size(0), batch_size):
-            indices = permutation[i:i + batch_size]
+        #for idx in range(0, X_train.size(0), batch_size):
+        for idx in range(0, 1, batch_size):
+            indices = permutation[idx:idx + batch_size]
             batch_X, batch_Y = X_train[indices], Y_train[indices]
 
             optimizer.zero_grad()
@@ -259,36 +278,44 @@ if __name__ == "__main__":
             loss.backward()
             optimizer.step()
 
+
         if (epoch + 1) % 100 == 0 or epoch == 0: # Estimate MI periodically
             # Get activations for the entire training set
             _ = model(X_train) # Forward pass to populate model.activations
 
+            # FIXME: Do analysis of activations one batch at a time?
             # Estimate Information Plane coordinates for each hidden layer
-            for i in range(len(hidden_dims)):
-                layer_name = f'hidden_{i}'
+            for idx in range(len(hidden_dims)):
+                layer_name = f'hidden_{idx}'
                 # Ensure activations are numpy arrays
                 layer_activations = model.activations[layer_name]
 
-                # Reshape activations if they are 1D or higher than 2D (e.g., from Conv layers)
+                # Reshape activations
                 if layer_activations.ndim == 1:
                     layer_activations = layer_activations.reshape(-1, 1)
-                elif layer_activations.ndim > 2:
-                     layer_activations = layer_activations.reshape(layer_activations.shape[0], -1)
 
-                # I(X; T) using GMM
+                """ # I(X; T) using GMM
                 IXT = estimate_mi_gmm(X_np_train, layer_activations,
-                                      n_components=num_gmm_components,
-                                      cov_type=gmm_covariance_type,
-                                      random_state=gmm_random_state)
+                        n_components=num_gmm_components,
+                        cov_type=gmm_covariance_type,
+                        random_state=gmm_random_state) """
 
                 # I(Y; T) using GMM (discrete Y, continuous T)
-                IYT = estimate_mi_discrete_continuous_gmm(Y_np_binary_train, layer_activations,
+                """ IYT = estimate_mi_discrete_continuous_gmm(Y_np_binary_train, layer_activations,
                                                         n_components=num_gmm_components,
                                                         cov_type=gmm_covariance_type,
-                                                        random_state=gmm_random_state)
-
-                information_plane_data[layer_name]['IXT'].append(IXT)
-                information_plane_data[layer_name]['IYT'].append(IYT)
+                                                        random_state=gmm_random_state) """
+                layer_sum_arr = jiggleArray(np.sum(layer_activations, axis=1).reshape(-1, 1))
+                IXT = RandomKernel.makeNormalizedMutualInformation(jiggleArray(X_np_train),
+                    layer_sum_arr, min_num_dimension_coordinate=8)
+                #IXT =  mi_regression(X_np_train.reshape(-1,1), layer_activations)
+                #IYT =  mi_regression(layer_activations, Y_np_binary_train.reshape(-1, 1))
+                IYT = RandomKernel.makeNormalizedMutualInformation(layer_sum_arr,
+                    jiggleArray(Y_np_binary_train), min_num_dimension_coordinate=8)
+                print(layer_name, IXT, IYT)
+                information_plane_dct.update({layer_name: InformationPlane(IXT=IXT, IYT=IYT)})
+                #information_plane_data[layer_name]['IXT'].append(IXT)
+                #information_plane_data[layer_name]['IYT'].append(IYT)
 
             # Calculate accuracy on test set
             model.eval() # Set model to evaluation mode
@@ -298,27 +325,38 @@ if __name__ == "__main__":
                 accuracy = (predicted_classes == Y_test).float().mean().item()
             model.train() # Set model back to training mode
 
-            current_loss = loss.item() if 'loss' in locals() else 'N/A'
-            print(f"Epoch {epoch+1}/{epochs}, Loss: {current_loss:.4f}, Test Accuracy: {accuracy:.4f}")
-
-    print("Training finished.")
+            if loss is None:
+                raise ValueError("Could not calculate loss.")
+            else:
+                current_loss = loss.item() if 'loss' in locals() else 'N/A'
+                print(f"Epoch {epoch+1}/{epochs}, Loss: {current_loss:.4f}, Test Accuracy: {accuracy:.4f}")
+    device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
+    print(f"Using {device} device")
+    import pdb; pdb.set_trace()
+    for name, param in model.named_parameters():
+        print(f"Layer: {name}")
+        print(f"Shape: {param.shape}")
+        print(f"Values:\n{param.data}")
+        print("-" * 50)
+        print("Training finished.")
 
     # --- 4. Plotting the Information Plane ---
     plt.figure(figsize=(10, 8))
-    colors = plt.cm.jet(np.linspace(0, 1, len(hidden_dims)))
+    from matplotlib import colormaps
+    colors = colormaps.jet(np.linspace(0, 1, len(hidden_dims)))
 
-    for i, layer_name in enumerate(information_plane_data.keys()):
-        IXT_values = information_plane_data[layer_name]['IXT']
-        IYT_values = information_plane_data[layer_name]['IYT']
+    for layer_name, information_plane in information_plane_dct.items():
+        IXT_values = information_plane.IXT
+        IYT_values = information_plane.IYT
 
         if len(IXT_values) > 0:
-            plt.plot(IXT_values, IYT_values, 'o-', color=colors[i], label=f'Layer {i+1} ({hidden_dims[i]} neurons)', alpha=0.7)
+            plt.plot(IXT_values, IYT_values, 'o-', color=colors[idx], label=f'Layer {idx+1} ({hidden_dims[idx]} neurons)', alpha=0.7)
             # Add annotations for start and end points
             if len(IXT_values) > 1:
-                plt.text(IXT_values[0], IYT_values[0], 'Start', fontsize=8, color=colors[i])
-                plt.text(IXT_values[-1], IYT_values[-1], 'End', fontsize=8, color=colors[i])
+                plt.text(IXT_values[0], IYT_values[0], 'Start', fontsize=8, color=colors[idx])
+                plt.text(IXT_values[-1], IYT_values[-1], 'End', fontsize=8, color=colors[idx])
             else: # If only one point, just mark it
-                plt.text(IXT_values[0], IYT_values[0], 'Point', fontsize=8, color=colors[i])
+                plt.text(IXT_values[0], IYT_values[0], 'Point', fontsize=8, color=colors[idx])
 
     plt.xlabel('$I(X; T)$ (Mutual Information between Input and Layer Activation)')
     plt.ylabel('$I(Y; T)$ (Mutual Information between Output and Layer Activation)')

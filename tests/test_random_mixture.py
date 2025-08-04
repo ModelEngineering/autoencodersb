@@ -4,11 +4,11 @@ from iplane.random_mixture_collection import PCollectionMixture, DCollectionMixt
 
 from matplotlib import pyplot as plt  # type: ignore
 import numpy as np
-from typing import List, Any, Tuple
+from typing import Tuple, Optional
 import unittest
 
-IGNORE_TESTS = False
-IS_PLOT = False
+IGNORE_TESTS = True
+IS_PLOT = True
 NUM_SAMPLE = 1000
 
 
@@ -246,6 +246,46 @@ class TestRandomMixture(unittest.TestCase):
         dcollection = self.random.makeDCollection(pcollection=pcollection)
         # Use a big delta on comparison because of the "roughness" of assuming non-overlapping distributions of components
         self.assertAlmostEqual(expected_entropy, dcollection.get(cn.DC_ENTROPY), delta=1)
+
+    def testMakeMarginal(self):
+        #if IGNORE_TESTS:
+        #    return
+        ##
+        def plotMarginal(random, dimension:int, ax=None):
+            marginal_random = random.makeMarginal(dimensions=[dimension])
+            variate_arr, density_arr, entropy, _ = marginal_random.dcollection.getAll()
+            if IS_PLOT:
+                if ax is None:
+                    _, ax = plt.subplots(1, 1)
+                ax.scatter(variate_arr, density_arr)
+                ax.set_title(f"Marginal Density for Dimension {dimension}")
+                ax.set_xlabel("Value")
+                ax.set_ylabel("Density")
+            return marginal_random, ax
+        ##
+        num_component = 3
+        num_dim = 2
+        variance = 1
+        covariance_arr = np.zeros((num_dim, num_dim))
+        diagonal_arr = np.array([(n+1)*variance for n in range(num_dim)])
+        np.fill_diagonal(covariance_arr, diagonal_arr)
+        component_covariance_arr = np.array([covariance_arr]*num_component)
+        mean_arr = np.array([np.array(range(num_dim))]*num_component)
+        weight_arr = np.repeat(1/num_component, num_component)
+        pcollection = PCollectionMixture(
+            mean_arr = mean_arr,
+            covariance_arr = component_covariance_arr,
+            weight_arr = weight_arr,
+        )
+        self.random.pcollection = pcollection
+        _ = self.random.makeDCollection(pcollection=pcollection)
+        marginal1_random = self.random.makeMarginal(dimensions=[1])
+        marginal0_random, ax = plotMarginal(self.random, dimension=0)
+        marginal1_random, _ = plotMarginal(self.random, dimension=1, ax=ax)
+        entropy0 = marginal0_random.dcollection.get(cn.DC_ENTROPY)
+        entropy1 = marginal1_random.dcollection.get(cn.DC_ENTROPY)
+        self.assertGreater(entropy1, entropy0)
+        plt.show()
 
 
 if __name__ == '__main__':

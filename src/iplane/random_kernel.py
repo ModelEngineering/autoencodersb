@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt # type: ignore
 from scipy.stats import gaussian_kde  # type: ignore
 from scipy.optimize import minimize # type: ignore
-from typing import Optional, cast
+from typing import Optional, cast, List
 
 
 ###############################################
@@ -365,3 +365,58 @@ class RandomKernel(RandomContinuous):
         pcollection = random_kernel.makePCollection(sample_arr)
         dcollection = random_kernel.makeDCollection(pcollection=pcollection)
         return dcollection.get(cn.DC_ENTROPY)
+    
+    def makeMarginal(self, dimensions:List[int]) -> 'RandomKernel':
+        """
+        Create a marginal distribution by selecting specific dimensions from the PCollection.
+
+        Args:
+            dimensions (List[int]): List of dimensions to include in the marginal distribution.
+
+        Returns:
+            RandomKernel: A new instance of RandomKernel with the specified dimensions.
+        """
+        if self.pcollection is None:
+            raise ValueError("PCollection has not been estimated yet.")
+        training_arr = self.pcollection.get(cn.PC_TRAINING_ARR)
+        marginal_training_arr = training_arr[:, np.array(dimensions)]
+        marginal_pcollection = self.makePCollection(marginal_training_arr)
+        marginal_dcollection = self.makeDCollection(pcollection=marginal_pcollection)
+        return RandomKernel(num_variate_sample=self.num_variate_sample, pcollection=marginal_pcollection,
+                dcollection=marginal_dcollection)
+
+    @classmethod 
+    def makeNormalizedMutualInformation(cls, sample_arr1:np.ndarray, sample_arr2:np.ndarray,
+            min_num_dimension_coordinate:Optional[int]=None) -> float:
+        """
+        Calculate the mutual information between two sets of samples. Normalizes by the sum of entropies of the two samples.
+
+        Args:
+            sample_arr1 (np.ndarray): First set of samples.
+            sample_arr2 (np.ndarray): Second set of samples.
+
+        Returns:
+            float: Normalized mutual information between the two sets of samples.
+        """
+        ##
+        def makeEntropy(sample_arr:np.ndarray) -> float:
+            """Calculate the entropy of a sample array."""
+            if sample_arr.ndim != 2:
+                raise ValueError("Sample array must be 2D.")
+            random = RandomKernel(num_variate_sample=sample_arr.shape[0],
+                    min_num_dimension_coordinate=min_num_dimension_coordinate)
+            pcollection = random.makePCollection(sample_arr)
+            dcollection = random.makeDCollection(pcollection=pcollection)
+            return dcollection.get(cn.DC_ENTROPY)
+        ##
+        #
+        if sample_arr1.shape[0] != sample_arr2.shape[0]:
+            raise ValueError("Both sample arrays must have the same number of rows.")
+        # Create the joint sample
+        joint_sample_arr = np.concatenate([sample_arr1, sample_arr2], axis=1)
+        entropy_joint = makeEntropy(joint_sample_arr)
+        entropy1 = makeEntropy(sample_arr1)
+        entropy2 = makeEntropy(sample_arr2)
+        # Calculate mutual information
+        mutual_info = (entropy1 + entropy2 - entropy_joint)/(entropy1 + entropy2)
+        return mutual_info

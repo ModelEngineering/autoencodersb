@@ -9,4 +9,5 @@ scipy
 seaborn
 tabulate
 torch
+torchvision
 scikit-learn

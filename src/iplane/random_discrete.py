@@ -41,7 +41,8 @@ class RandomDiscrete(Random):
         category_arr, count_arr = np.unique(sample_arr, return_counts=True)
         probability_arr = count_arr / len(sample_arr)
         dct = {cn.PC_CATEGORY_ARR: category_arr, cn.PC_PROBABILITY_ARR: probability_arr }
-        return PCollectionDiscrete(dct)
+        self.pcollection = PCollectionDiscrete(dct)
+        return self.pcollection
     
     def makeDCollection(self, variate_arr:Optional[np.ndarray]=None,
                 pcollection:Optional[PCollectionDiscrete]=None) -> DCollectionDiscrete:
@@ -72,7 +73,7 @@ class RandomDiscrete(Random):
             if self.dcollection is None:
                 if self.pcollection is None:
                     raise ValueError("PCollection has not been estimated yet.")
-                self.dcollection = self.makeDCollection(self.pcollection)
+                self.dcollection = self.makeDCollection(pcollection=self.pcollection)
             else:
                 dcollection = self.dcollection
         #

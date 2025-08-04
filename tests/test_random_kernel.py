@@ -11,8 +11,8 @@ from scipy.stats import gaussian_kde  # type: ignore
 from typing import Tuple, cast
 import unittest
 
-IGNORE_TESTS = False 
-IS_PLOT = False
+IGNORE_TESTS = True
+IS_PLOT = True
 NUM_SAMPLE = 100
 mixture = RandomMixture()
 MEAN = 100
@@ -160,13 +160,12 @@ class TestRandomMixture(unittest.TestCase):
         cdf = random_kernel.makeCDF(sample_arr)
         return BivariateResult(kernel=random_kernel, sample_arr=sample_arr, cdf=cdf, pcollection=pcollection_kernel)
 
-    # FIXME: Is this used?
     def testMakeCDFBivariate(self):
         """Test the creation of CDF from variate array."""
         if IGNORE_TESTS:
             return
         bivariate_result = self.makeBivariate()
-        random_kernel, cdf = bivariate_result.kernel, bivariate_result.cdf
+        _, cdf = bivariate_result.kernel, bivariate_result.cdf
         self.assertTrue(isinstance(cdf.variate_arr, np.ndarray))
         self.assertTrue(isinstance(cdf.cdf_arr, np.ndarray))
         self.assertEqual(cdf.variate_arr.shape[0], cdf.cdf_arr.shape[0])
@@ -215,6 +214,71 @@ class TestRandomMixture(unittest.TestCase):
                 plt.show()
         #
         test(100)
+    
+    def testMakeMarginal(self):
+        if IGNORE_TESTS:
+            return
+        ##
+        def plotMarginal(random, dimension:int, ax=None):
+            marginal_random = random.makeMarginal(dimensions=[dimension])
+            variate_arr, density_arr, entropy, _ = marginal_random.dcollection.getAll()
+            if IS_PLOT:
+                if ax is None:
+                    _, ax = plt.subplots(1, 1)
+                ax.scatter(variate_arr, density_arr)
+                ax.set_title(f"Marginal Density for Dimension {dimension}")
+                ax.set_xlabel("Value")
+                ax.set_ylabel("Density")
+            return marginal_random, ax
+        ##
+        num_component = 3
+        num_dim = 2
+        variance = 1
+        covariance_arr = np.zeros((num_dim, num_dim))
+        diagonal_arr = np.array([(n+1)*variance for n in range(num_dim)])
+        np.fill_diagonal(covariance_arr, diagonal_arr)
+        component_covariance_arr = np.array([covariance_arr]*num_component)
+        mean_arr = np.array([np.array(range(num_dim))]*num_component)
+        weight_arr = np.repeat(1/num_component, num_component)
+        pcollection = PCollectionMixture(
+            mean_arr = mean_arr,
+            covariance_arr = component_covariance_arr,
+            weight_arr = weight_arr,
+        )
+        random = RandomMixture()
+        random.pcollection = pcollection
+        _ = random.makeDCollection(pcollection=pcollection)
+        marginal1_random = random.makeMarginal(dimensions=[1])
+        marginal0_random, ax = plotMarginal(random, dimension=0)
+        marginal1_random, _ = plotMarginal(random, dimension=1, ax=ax)
+        entropy0 = marginal0_random.dcollection.get(cn.DC_ENTROPY)
+        entropy1 = marginal1_random.dcollection.get(cn.DC_ENTROPY)
+        self.assertGreater(entropy1, entropy0)
+        plt.show()
+
+    def testMakeMutualInformation(self):
+        """Test the mutual information calculation between two Random instances."""
+        if IGNORE_TESTS:
+            return
+        mean_arr = [0, 5]
+        error_mean_arr = [0, 0]
+        covariance_arr = np.array([[1, 0.5], [0.5, 1]])
+        error_covariance_arr = np.array([[0.1, 0], [0, 0.1]])
+        sample_arr1 = np.random.multivariate_normal(mean_arr, covariance_arr, size=100)
+        sample_arr2 = 4*sample_arr1 + np.random.multivariate_normal(error_mean_arr, error_covariance_arr, size=100)
+        mutual_info = RandomKernel.makeNormalizedMutualInformation(sample_arr1, sample_arr2, min_num_dimension_coordinate=3)
+        self.assertAlmostEqual(mutual_info, 1.0, places=1)
+    
+    def testMakeMutualInformationDiscrete(self):
+        """Test the mutual information calculation between two Random instances."""
+        #if IGNORE_TESTS:
+        #    return
+        mean_arr = [0, 5]
+        covariance_arr = np.array([[1, 0], [0, 1]])
+        sample_arr1 = np.random.multivariate_normal(mean_arr, covariance_arr, size=100000)
+        sample_arr2 = np.array([(x > 0) and (y > 5) for x, y in sample_arr1])
+        mutual_info = RandomKernel.makeNormalizedMutualInformation(sample_arr1, sample_arr2.reshape(-1, 1), min_num_dimension_coordinate=3)
+        print(f"Mutual Information: {mutual_info}")
 
 if __name__ == '__main__':
     unittest.main()

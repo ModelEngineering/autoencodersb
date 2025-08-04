@@ -90,7 +90,7 @@ class RandomContinuous(Random):
     def __init__(self,
             num_variate_sample:int = cn.NUM_VARIATE_SAMPLE,
             axis_length_std:float = cn.AXIS_LENGTH_STD,
-            min_num_dimension_coordinate:int = MIN_NUM_DIMENSION_SAMPLE,
+            min_num_dimension_coordinate:Optional[int] = None,
             **kwargs) -> None:
         """ Initializes the RandomContinuous object.
         Args:
@@ -99,6 +99,8 @@ class RandomContinuous(Random):
             min_num_dimension_sample (int): Mininum number of coordinate for each dimension
         """
         super().__init__(**kwargs)
+        if min_num_dimension_coordinate is None:
+            min_num_dimension_coordinate = MIN_NUM_DIMENSION_SAMPLE
         self.axis_length_std = axis_length_std
         self.num_variate_sample = num_variate_sample
         self.min_num_dimension_coordinate = min_num_dimension_coordinate

@@ -118,6 +118,29 @@ class Random(object):
             dcollection:Optional[Any]=None) -> None:
         self.pcollection = pcollection
         self.dcollection = dcollection
+    
+    def calculateEntropy(self, collection:Any) -> float:
+        """Analytic calculation of the entropy of the distribution based on the parameters of the distribution."""
+        raise NotImplementedError("This method should be overridden by subclasses.")
+    
+    def evaluate(self, pcollection:Any, num_samples:int) -> bool:
+        """Evaluate the calculation using a round trip of estimation and generation."""
+        sample_arr = self.generateSample(pcollection, num_samples)
+        estimated_pcollection = self.makePCollection(sample_arr)
+        dcollection = self.makeDCollection(pcollection=estimated_pcollection)
+        return dcollection == self.makeDCollection(pcollection)
+
+    def generateSample(self, pcollection:Any, num_sample:int) -> np.ndarray:
+        """Generate a random sample from the self.actual_parameter."""
+        raise NotImplementedError("This method should be overridden by subclasses.")
+    
+    def makeDCollection(self, *args, **kwargs)  -> DCollection:
+        """Create a Distribution object from the ParameterCollection."""
+        raise NotImplementedError("This method should be overridden by subclasses.")
+    
+    def makeMarginal(self, dimensions:List[int]) -> 'Random':
+        """Create a marginal distribution"""
+        raise NotImplementedError("This method should be overridden by subclasses.")
 
     def makePCollection(self, sample_arr: np.ndarray) -> PCollection:
         """Estimates the Parameter instance for from the data array."""
@@ -128,24 +151,13 @@ class Random(object):
         """Uses saved PCollection if this is not specified."""
         raise NotImplementedError("This method should be overridden by subclasses.")
     
-    def makeDCollection(self, *args, **kwargs)  -> DCollection:
-        """Create a Distribution object from the ParameterCollection."""
-        raise NotImplementedError("This method should be overridden by subclasses.")
-
-    def generateSample(self, pcollection:Any, num_sample:int) -> np.ndarray:
-        """Generate a random sample from the self.actual_parameter."""
-        raise NotImplementedError("This method should be overridden by subclasses.")
-    
-    def calculateEntropy(self, collection:Any) -> float:
-        """Analytic calculation of the entropy of the distribution based on the parameters of the distribution."""
-        raise NotImplementedError("This method should be overridden by subclasses.")
-
-    def evaluate(self, pcollection:Any, num_samples:int) -> bool:
-        """Evaluate the calculation using a round trip of estimation and generation."""
-        sample_arr = self.generateSample(pcollection, num_samples)
-        estimated_pcollection = self.makePCollection(sample_arr)
-        dcollection = self.makeDCollection(pcollection=estimated_pcollection)
-        return dcollection == self.makeDCollection(pcollection)
+    def setDCollection(self, dcollection:Union[DCollection, None]) -> DCollection:
+        """Set the DCollection for this Random instance."""
+        if dcollection is None:
+            if self.dcollection is None:
+                raise RuntimeError("DCollection has not been set.")
+            dcollection = self.dcollection
+        return cast(DCollection, dcollection)
     
     def setPCollection(self, pcollection:Union[PCollection, None]) -> PCollection:
         """Set the PCollection for this Random instance."""
@@ -154,11 +166,3 @@ class Random(object):
                 raise RuntimeError("PCollection has not been set.")
             pcollection = self.pcollection
         return cast(PCollection, pcollection)
-    
-    def setDCollection(self, dcollection:Union[DCollection, None]) -> DCollection:
-        """Set the DCollection for this Random instance."""
-        if dcollection is None:
-            if self.dcollection is None:
-                raise RuntimeError("DCollection has not been set.")
-            dcollection = self.dcollection
-        return cast(DCollection, dcollection)
