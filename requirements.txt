@@ -10,4 +10,5 @@ seaborn
 tabulate
 torch
 torchvision
+tqdm
 scikit-learn

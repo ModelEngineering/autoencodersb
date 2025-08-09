@@ -1,13 +1,14 @@
 '''DataLoader for CSV files'''
 
+import numpy as np  # type: ignore
 import pandas as pd # type: ignore
 import torch
 from torch.utils.data import Dataset
-from typing import Optional, Union, cast
+from typing import Optional, Union
 
 
 class DatasetCSV(Dataset): 
-    def __init__(self, csv_input:Union[str, pd.DataFrame], target_column:str, transform=None):
+    def __init__(self, csv_input:Union[str, pd.DataFrame], target_column:Optional[str]=None, transform=None):
         """
         All columns except the target column are considered features.
 
@@ -20,9 +21,13 @@ class DatasetCSV(Dataset):
             self.data_df = csv_input
         else:
             self.data_df = pd.read_csv(csv_input)
+        self.target_column = target_column
         feature_columns = [col for col in self.data_df.columns if col != target_column]
         self.feature_tnsr = torch.tensor(self.data_df[feature_columns].values)
-        self.target_tnsr = torch.tensor(self.data_df[target_column].values)
+        if target_column is None:
+            self.target_tnsr = torch.zeros(len(self.data_df))
+        else:
+            self.target_tnsr = torch.tensor(self.data_df[target_column].values)
         self.transform = transform
 
     def __len__(self):
@@ -32,7 +37,10 @@ class DatasetCSV(Dataset):
     def __getitem__(self, idx):
         # Get features and target
         feature_tnsr = self.feature_tnsr[idx].detach().clone()
-        target_tnsr = self.target_tnsr[idx].detach().clone()
+        if self.target_column is None:
+            target_tnsr = torch.tensor(np.nan)
+        else:
+            target_tnsr = self.target_tnsr[idx].detach().clone()
         
         # Apply transform if specified
         if self.transform:

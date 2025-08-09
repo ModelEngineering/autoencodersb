@@ -10,30 +10,37 @@ import torchvision.transforms as transforms     # type: ignore
 from typing import List
 import matplotlib.pyplot as plt
 
+LAYER_DIMENSIONS = [784, 512, 256, 128, 64]  # Example dimensions for MNIST
+
 
 ########################################################################
 class Autoencoder(nn.Module):
     # Basic Autoencoder
-    def __init__(self, input_dim=784, encoding_dim=64):
+    def __init__(self, layer_dimensions: List[int]):
+        """
+
+        Args:
+            dimensions (List[int]): List of dimensions for the autoencoder 
+                The first element is the input dimension,
+                the last element is the encoding dimension.
+        """
         super(Autoencoder, self).__init__()
+        self.layer_dimensions = layer_dimensions
+        self.input_dim = layer_dimensions[0]
+        self.encoding_dim = layer_dimensions[-1]
+        # Calculate dimension of hidden layer
         # Encoder
-        self.encoder = nn.Sequential(
-            nn.Linear(input_dim, 256),
-            nn.ReLU(),
-            nn.Linear(256, 128),
-            nn.ReLU(),
-            nn.Linear(128, encoding_dim),
-            nn.ReLU()
-        )
+        encoder_layers:list = []
+        for idx in range(len(layer_dimensions) - 1):
+            encoder_layers.append(nn.Linear(layer_dimensions[idx], layer_dimensions[idx + 1]))
+            encoder_layers.append(nn.ReLU())
+        self.encoder = nn.Sequential(*encoder_layers[0:-1]) 
         # Decoder
-        self.decoder = nn.Sequential(
-            nn.Linear(encoding_dim, 128),
-            nn.ReLU(),
-            nn.Linear(128, 256),
-            nn.ReLU(),
-            nn.Linear(256, input_dim),
-            nn.Sigmoid()  # Output between 0 and 1 for image reconstruction
-        )
+        decoder_layers:list = []
+        for idx in range(len(layer_dimensions) - 1, 0, -1):
+            decoder_layers.append(nn.Linear(layer_dimensions[idx], layer_dimensions[idx - 1]))
+            decoder_layers.append(nn.ReLU())
+        self.decoder = nn.Sequential(*decoder_layers[0:-1])
 
     def forward(self, x):
         # Encode
@@ -54,10 +61,12 @@ class Autoencoder(nn.Module):
 ########################################################################
 class AutoencoderRunner(object):
     # Runner for Autoencoder
+    layer_dimensions = [784, 512, 256, 128, 64]  # Example dimensions for MNIST
 
-    def __init__(self, num_epoch:int=3, learning_rate:float=1e-3, is_report:bool=False):
+    def __init__(self, layer_dimensions:List[int]=LAYER_DIMENSIONS,
+            num_epoch:int=3, learning_rate:float=1e-3, is_report:bool=False):
         self.device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"  # type: ignore
-        self.model = Autoencoder(input_dim=784, encoding_dim=64).to(self.device)
+        self.model = Autoencoder(layer_dimensions).to(self.device)
         self.num_epoch = num_epoch
         self.learning_rate = learning_rate
         self.losses: list = []

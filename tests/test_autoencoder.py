@@ -13,7 +13,7 @@ IS_PLOT = False
 NUM_EPOCH = 3
 
 
-class TestTrainingVisualizer(unittest.TestCase):
+class TestAutoencoder(unittest.TestCase):
 
     def setUp(self):
         self.runner = AutoencoderRunner(num_epoch=NUM_EPOCH, is_report=IGNORE_TESTS)
