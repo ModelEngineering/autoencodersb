@@ -5,10 +5,12 @@ numpy
 nose2
 pandas
 pip
+plotly
 scipy
 seaborn
 tabulate
 torch
 torchvision
 tqdm
+umap-learn
 scikit-learn

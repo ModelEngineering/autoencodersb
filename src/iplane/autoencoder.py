@@ -42,18 +42,18 @@ class Autoencoder(nn.Module):
             decoder_layers.append(nn.ReLU())
         self.decoder = nn.Sequential(*decoder_layers[0:-1])
 
-    def forward(self, x):
+    def forward(self, x:torch.Tensor) -> torch.Tensor:
         # Encode
         encoded = self.encoder(x)
         # Decode
         decoded = self.decoder(encoded)
         return decoded
-    
-    def encode(self, x):
+
+    def encode(self, x:torch.Tensor) -> torch.Tensor:
         """Get encoded representation"""
         return self.encoder(x)
     
-    def decode(self, x):
+    def decode(self, x:torch.Tensor) -> torch.Tensor:
         """Decode from encoded representation"""
         return self.decoder(x)
 
