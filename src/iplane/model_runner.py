@@ -1,5 +1,7 @@
 '''Abstract class for running a model. '''
 
+from iplane import constants as cn
+
 from collections import namedtuple
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,10 +10,8 @@ from pandas.plotting import parallel_coordinates # type: ignore
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from typing import cast, Tuple
+from typing import cast, Tuple, List, Optional
 
-
-CPU = 'cpu'
 
 """
 Subclasses must implement the following methods:
@@ -21,9 +21,11 @@ Subclasses must implement the following methods:
 
 class RunnerResult(object):
     """Result of the model runner."""
-    def __init__(self, avg_loss: float, losses: list):
+    def __init__(self, avg_loss: float, losses: Optional[list]=None,
+            mean_absolute_error: Optional[float]=None):
         self.avg_loss = avg_loss
-        self.losses = losses
+        self.losses = losses if losses is not None else []
+        self.mean_absolute_error = mean_absolute_error
 
     def __len__(self):
         return len(self.losses)
@@ -33,7 +35,7 @@ class RunnerResult(object):
 class ModelRunner(object):
     # Runner for Autoencoder
 
-    def __init__(self, criterion:nn.Module=nn.MSELoss(), is_report:bool=False, decimal_digits:int=0):
+    def __init__(self, criterion:nn.Module=nn.MSELoss(), is_report:bool=False):
         """
         Args:
             criterion (nn.Module): Loss function to use for training.
@@ -86,7 +88,7 @@ class ModelRunner(object):
             for (feature_tnsr, target_tnsr) in list(test_loader):
                 feature_tnsr = feature_tnsr.view(feature_tnsr.size(0), -1)
                 prediction_tnsr = self.predict(feature_tnsr)
-                loss = self.criterion(prediction_tnsr.to(CPU), target_tnsr)
+                loss = self.criterion(prediction_tnsr.to(cn.CPU), target_tnsr)
                 test_losses.append(loss.item())
         
         avg_test_loss = cast(float, np.mean(test_losses))
@@ -112,22 +114,52 @@ class ModelRunner(object):
         test_runner_result = self.evaluate(test_loader)
         return train_runner_result, test_runner_result
     
-    def plotEvaluate(self, test_loader: DataLoader, is_plot: bool = True):
-        """Plot the evaluation results."""
+    def plotEvaluate(self, test_loader: DataLoader, ax=None, is_plot: bool = True):
+        """Plot the evaluation results.
+            ax (Optional[plt.Axes]): Matplotlib axes to plot on.
+        """
         columns = test_loader.dataset.data_df.columns # type: ignore
         feature_tnsr, target_tnsr = self.getFeatureTarget(test_loader)
         prediction_tnsr = self.predict(feature_tnsr)
-        prediction_df = pd.DataFrame(prediction_tnsr.to(CPU).numpy(), columns=columns)
-        target_df = pd.DataFrame(target_tnsr.to(CPU).numpy(), columns=columns)
+        prediction_df = pd.DataFrame(prediction_tnsr.to(cn.CPU).numpy(), columns=columns)
+        target_df = pd.DataFrame(target_tnsr.to(cn.CPU).numpy(), columns=columns)
         plot_df = (prediction_df - target_df)/target_df
         plot_df['class'] = "relative error"
         # Plot
-        _, ax = plt.subplots(figsize=(10, 6))
+        if ax is None:
+            _, ax = plt.subplots(figsize=(10, 6))
         parallel_coordinates(plot_df, "class", ax=ax, alpha=0.7,
                 color=['blue', 'orange'], linewidth=0.3)
         ax.plot([0, len(columns)-1], [0, 0], '--', color='red')
         ax.set_title(f"{len(prediction_df)} Relative Prediction Errors")
         ax.set_xlabel("features")
         ax.set_ylabel("fractional Error relative to true target")
+        plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
+        if is_plot:
+            plt.show()
+
+    def studyAccuracy(self, test_loaders: List[DataLoader], loader_names: List[str], 
+            epochs: List[int], is_plot: bool = True):
+        """
+        Plots the accuracy of the model over different epochs and noise levels
+        Args:
+            test_loader (DataLoader): DataLoader for the test data.
+            loader_names (List[str]): Names of the DataLoaders for plotting.
+            epochs (List[int]): List of epochs to evaluate.
+            is_plot (bool): Whether to plot the results.
+        """
+        num_column = len(test_loaders)
+        num_row = len(epochs)
+        _, axes = plt.subplots(num_row, num_column, figsize=(15, 10*num_row))
+        # Do the plots
+        for icolumn in range(num_column):
+            for irow in range(num_row):
+                ax = axes[irow, icolumn]
+                self.plotEvaluate(test_loaders[icolumn], ax=ax, is_plot=is_plot)
+                if irow < num_row - 1:
+                    ax.set_xlabel([])
+                if icolumn > 0:
+                    ax.set_ylabel([])
+        plt.tight_layout()
         if is_plot:
             plt.show()

@@ -10,21 +10,23 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-class PCAPredictor(ModelRunner):
+
+class ModelRunnerPCA(ModelRunner):
     """
     Calculates predicted value using PCA.
     """
 
-    def __init__(self, random_state:int=42, n_components:int=2):
+    def __init__(self, n_components:int=2, random_state:int=42, **kwargs):
         """
         Args:
             random_state (int, optional): Random state for reproducibility. Defaults to 42.
             n_components (int, optional): Number of PCA components. Defaults to 2.
         """
-        self.random_state = random_state
+        super().__init__(**kwargs)
         self.n_components = n_components
+        self.random_state = random_state
         self.scaler = StandardScaler()
-        self.pca = PCA(n_components=n_components, random_state=self.random_state)
+        self.pca = PCA(n_components=self.n_components, random_state=self.random_state)
     
     def fit(self, train_loader: DataLoader) -> RunnerResult:
         """
@@ -46,12 +48,12 @@ class PCAPredictor(ModelRunner):
         self.pca.fit(x_scaled)
         # Calculate losses
         prediction_tnsr = self.predict(feature_tnsr)
-        losses = self.criterion(prediction_tnsr, target_tnsr)
-        avg_loss = np.mean(losses)
+        avg_loss = self.criterion(prediction_tnsr, target_tnsr)
+        mean_absolute_error = torch.mean(torch.abs(prediction_tnsr - target_tnsr)).numpy().item()
         #
-        return RunnerResult(avg_loss=avg_loss, losses=losses)
+        return RunnerResult(avg_loss=avg_loss, mean_absolute_error=mean_absolute_error)
 
-    def encode(self, x_test:torch.Tensor) -> torch.Tensor:
+    def _encode(self, x_test:torch.Tensor) -> torch.Tensor:
         """
         Encode data using PCA
         
@@ -67,7 +69,7 @@ class PCAPredictor(ModelRunner):
         """
         return torch.Tensor(self.pca.transform(self.scaler.transform(x_test.numpy()))) # type: ignore
 
-    def decode(self, x_reduced:torch.Tensor) -> torch.Tensor:
+    def _decode(self, x_reduced:torch.Tensor) -> torch.Tensor:
         """
         Decode data back to original space
         
@@ -97,4 +99,4 @@ class PCAPredictor(ModelRunner):
         X_predicted : array-like, shape (n_samples, n_components)
             Predicted data
         """
-        return self.decode(self.encode(feature_tnsr))
+        return self._decode(self._encode(feature_tnsr))

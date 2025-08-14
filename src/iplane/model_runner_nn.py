@@ -1,5 +1,6 @@
 '''Running a model for a neural network.'''
 
+import iplane.constants as cn  # type: ignore
 from iplane.model_runner import ModelRunner, RunnerResult  # type: ignore
 
 from collections import namedtuple
@@ -18,7 +19,6 @@ from typing import Optional, Tuple, cast
 1. Calculate mutual information between: (a) input and first hidden; (b) output and last hidden
 """
 
-CPU = 'cpu'
 
 
 class RunnerResultPredict(RunnerResult):
@@ -30,10 +30,11 @@ class RunnerResultPredict(RunnerResult):
 
 class RunnerResultFit(RunnerResultPredict):
     def __init__(self, avg_loss: float, losses: list, num_epochs: int,
-            mi_input_hidden1_epochs: list, mi_hidden2_output_epochs: list):
+            mi_input_hidden1_epochs: list, mi_hidden2_output_epochs: list, accuracies: list):
         super().__init__(avg_loss, losses, num_epochs)
         self.mi_input_hidden1_epochs = mi_input_hidden1_epochs
         self.mi_hidden2_output_epochs = mi_hidden2_output_epochs
+        self.accuracies = accuracies
 
 
 class ModelRunnerNN(ModelRunner):
@@ -54,9 +55,8 @@ class ModelRunnerNN(ModelRunner):
                                         Defaults to False.
         """
         super().__init__(criterion=criterion, is_report=is_report)
-        self.device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"  # type: ignore
         if model is not None:
-            self.model = model.to(self.device)
+            self.model = model.to(cn.DEVICE)
         self.num_epoch = num_epoch
         self.learning_rate = learning_rate
         self.is_normalized = is_normalized
@@ -74,11 +74,13 @@ class ModelRunnerNN(ModelRunner):
             decimal_digits (int, optional): Number of decimal digits to round to. Defaults to 0.
         
         Returns:
-            Array of int
+            Array of float
         """
         arr = tensor.cpu().numpy()
-        return np.round(arr, decimals=self.ndigit).astype(int)
-
+        int_arr = np.round(10**self.ndigit*arr, decimals=0).astype(int)
+        return int_arr/(10**self.ndigit)
+    
+    # FIXME: Identify the row that have inaccurate predictions with a dataframe of feature, target, prediction, accuracy
     def fit(self, train_loader: DataLoader) -> RunnerResultPredict:
         """
         Train the model. Leave it on the accelerator device.
@@ -123,9 +125,9 @@ class ModelRunnerNN(ModelRunner):
             epoch_loss = 0
             for (feature_tnsr, target_tnsr) in train_loader:
                 feature_tnsr = feature_tnsr/self.feature_std_tnsr
-                feature_tnsr = feature_tnsr.to(self.device)
+                feature_tnsr = feature_tnsr.to(cn.DEVICE)
                 target_tnsr = target_tnsr/self.target_std_tnsr
-                target_tnsr = target_tnsr.to(self.device)
+                target_tnsr = target_tnsr.to(cn.DEVICE)
                 # Forward pass
                 prediction_tnsr = self.model(feature_tnsr)
                 loss = self.criterion(prediction_tnsr, target_tnsr)
@@ -135,10 +137,10 @@ class ModelRunnerNN(ModelRunner):
                 optimizer.step()
                 #
                 epoch_loss += loss.item()
-            # Calculate accuracy by row
+            # Calculate accuracy
             full_prediction_tnsr = self.predict(full_feature_tnsr)
-            true_arr = self._round(full_target_tnsr) == self._round(full_prediction_tnsr)
-            accurate_rows = true_arr.sum(axis=1) == true_arr.shape[1]
+            accuracy_arr = self._round(full_target_tnsr) == self._round(full_prediction_tnsr)
+            accurate_rows = accuracy_arr.sum(axis=1) == accuracy_arr.shape[1]
             accuracy = np.mean(accurate_rows)
             # Record average loss for the epoch
             accuracies.append(accuracy)
@@ -150,22 +152,22 @@ class ModelRunnerNN(ModelRunner):
         avg_loss = cast(float, np.mean(losses))
         return RunnerResultFit(avg_loss=avg_loss, losses=losses, num_epochs=self.num_epoch,
                 mi_input_hidden1_epochs=mi_hidden1_input_epochs,
-            mi_hidden2_output_epochs=mi_hidden2_output_epochs)
-    
+                mi_hidden2_output_epochs=mi_hidden2_output_epochs, accuracies=accuracies)
+
     def predict(self, feature_tnsr: torch.Tensor) -> torch.Tensor:
         """Predicts the target for the features.
         Args:
             feature_tnsr (torch.Tensor): Input features for which to predict targets.
         Returns:
-            torch.Tensor: target predictions (on self.device)
+            torch.Tensor: target predictions (on cn.DEVICE)
         """
         self.model.eval()
         if self.is_model_on_cpu():
-            self.model.to(self.device)
-        device_feature_tnsr = feature_tnsr.to(self.device)/self.feature_std_tnsr.to(self.device)
+            self.model.to(cn.DEVICE)
+        device_feature_tnsr = feature_tnsr.to(cn.DEVICE)/self.feature_std_tnsr.to(cn.DEVICE)
         with torch.no_grad():
             prediction_tnsr = self.model(device_feature_tnsr)
-        return self.feature_std_tnsr.to(self.device)*prediction_tnsr
+        return self.feature_std_tnsr.to(cn.DEVICE)*prediction_tnsr
 
     def get_model_device(self) -> torch.device:
         """Get the device where the model is currently located."""
@@ -177,4 +179,4 @@ class ModelRunnerNN(ModelRunner):
     
     def is_model_on_cpu(self) -> bool:
         """Check if the model is on CPU."""
-        return self.get_model_device().type == 'cpu'
+        return self.get_model_device().type == cn.CPU

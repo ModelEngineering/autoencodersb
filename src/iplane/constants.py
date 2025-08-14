@@ -1,5 +1,10 @@
 from collections import namedtuple
 import numpy as np
+import torch
+
+# Set device
+CPU = 'cpu'
+DEVICE = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else CPU  # type: ignore
 
 
 NULL_ARR = np.array([])  # type: ignore

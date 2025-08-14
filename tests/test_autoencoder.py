@@ -41,13 +41,13 @@ class TestAutoencoder(unittest.TestCase):
         if IGNORE_TESTS:
             return
         self.runner.run()
-        self.runner.to('cpu')
+        self.runner.to(cn.CPU)
         if IS_PLOT:
             self.runner.visualize_compression()
         # Since this method primarily produces plots, we check if the model can encode and decode
         sample_data = next(iter(self.runner.test_loader))[0]
-        sample_data = sample_data.view(sample_data.size(0), -1).to(self.runner.device)
-        sample_data = sample_data.to('cpu')
+        sample_data = sample_data.view(sample_data.size(0), -1).to(cn.DEVICE)
+        sample_data = sample_data.to(cn.CPU)
         with torch.no_grad():
             encoded = self.runner.model.encode(sample_data)
             decoded = self.runner.model.decode(encoded)

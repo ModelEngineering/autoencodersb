@@ -1,5 +1,7 @@
 '''This module trains, runs a visualizes a fully connected autoencoder on the MNIST dataset.'''
 
+import iplane.constants as cn
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -65,8 +67,7 @@ class AutoencoderRunner(object):
 
     def __init__(self, layer_dimensions:List[int]=LAYER_DIMENSIONS,
             num_epoch:int=3, learning_rate:float=1e-3, is_report:bool=False):
-        self.device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"  # type: ignore
-        self.model = Autoencoder(layer_dimensions).to(self.device)
+        self.model = Autoencoder(layer_dimensions).to(cn.DEVICE)
         self.num_epoch = num_epoch
         self.learning_rate = learning_rate
         self.losses: list = []
@@ -100,11 +101,11 @@ class AutoencoderRunner(object):
                     data = data.view(data.size(0), -1)
                 
                 # Forward pass
-                data = data.to(self.device)
+                data = data.to(cn.DEVICE)
                 reconstructed = self.model(data)
                 loss = criterion(reconstructed, data)
-                data = data.to('cpu')
-                
+                data = data.to(cn.CPU)
+
                 # Backward pass
                 optimizer.zero_grad()
                 loss.backward()
@@ -192,4 +193,4 @@ class AutoencoderRunner(object):
             print("Training Fully Connected Autoencoder...")
         # Create and train fully connected autoencoder
         self.losses = self.train()
-        self.model = self.model.to('cpu')
+        self.model = self.model.to(cn.CPU)
