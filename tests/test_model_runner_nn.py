@@ -13,17 +13,16 @@ import unittest
 
 IGNORE_TESTS = True
 IS_PLOT = True
-NUM_EPOCH = 10000
-NUM_EPOCH = 50
+NUM_EPOCH = 20000
+NUM_EPOCH = 5000
 
 TARGET_COLUMN = "target"  # Assuming the target column is named 'target'
-NUM_DEPENDENT_FEATURE = 12
 NUM_DEPENDENT_FEATURE = 6
 NUM_OUTPUT_FEATURE = 2
 NUM_INPUT_FEATURE = NUM_DEPENDENT_FEATURE + NUM_OUTPUT_FEATURE
 NUM_SAMPLE = 1000
-MODEL = Autoencoder(layer_dimensions=[NUM_INPUT_FEATURE,
-        10*NUM_INPUT_FEATURE, 10*NUM_OUTPUT_FEATURE, NUM_OUTPUT_FEATURE])  # Example model
+MODEL = Autoencoder(layer_dimensions=[NUM_INPUT_FEATURE, 10*NUM_INPUT_FEATURE,
+        10*NUM_OUTPUT_FEATURE, NUM_OUTPUT_FEATURE])  # Example model
 TRAIN_DL = makeAutocoderData(num_sample=NUM_SAMPLE, num_independent_feature=NUM_OUTPUT_FEATURE,
         num_dependent_feature=NUM_DEPENDENT_FEATURE, num_value=10)
 TEST_DL = makeAutocoderData(num_sample=1000, num_independent_feature=NUM_OUTPUT_FEATURE,
@@ -35,7 +34,7 @@ class TestModelRunner(unittest.TestCase):
     def setUp(self):
         self.runner = ModelRunnerNN(model=MODEL, num_epoch=NUM_EPOCH,
                 learning_rate=1e-5, is_normalized=True,
-                ndigit=0)
+                max_fractional_error=0.1)
 
     def testTrain(self):
         if IGNORE_TESTS:
