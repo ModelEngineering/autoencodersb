@@ -47,7 +47,9 @@ class ModelRunnerNN(ModelRunner):
 
     def __init__(self, model: Optional[nn.Module]=None, num_epoch:int=3, learning_rate:float=1e-3,
                 criterion:nn.Module=nn.MSELoss(), max_fractional_error: float=0.10,
-                is_normalized:bool=False, is_report:bool=False):
+                is_normalized:bool=True, 
+                noise_std: float=0.1, is_l1_regularization:bool=True, is_accuracy_regularization:bool=True,
+                is_report:bool=False):
         """
         Args:
             model (nn.Module): Model being run
@@ -56,6 +58,11 @@ class ModelRunnerNN(ModelRunner):
             is_normalized (bool, optional): Whether to normalize the input data (divide by std).
                                             Defaults to False.
             max_fractional_error (float): Maximum error desired for each prediction
+            noise_std (float, optional): Standard deviation of noise to add to inputs.
+            is_l1_regularization (bool, optional): Whether to use L1 regularization.
+                                                    Defaults to True.
+            is_accuracy_regularization (bool, optional): Whether to use accuracy regularization.
+                                                    Defaults to True.
             is_report (bool, optional): Print text for progress.
                                         Defaults to False.
         """
@@ -66,6 +73,9 @@ class ModelRunnerNN(ModelRunner):
         self.learning_rate = learning_rate
         self.is_normalized = is_normalized
         self.max_fractional_error = max_fractional_error
+        self.noise_std = noise_std
+        self.is_l1_regularization = is_l1_regularization
+        self.is_accuracy_regularization = is_accuracy_regularization
         # Calculated state
         self.feature_std_tnsr = torch.tensor([np.nan])
         self.target_std_tnsr = torch.tensor([np.nan])
@@ -91,6 +101,27 @@ class ModelRunnerNN(ModelRunner):
         accurate_rows = torch.sum(accuracy_tnsr, dim=1) == accuracy_tnsr.shape[1]
         accuracy = torch.sum(accurate_rows) / accurate_rows.shape[0]
         return accuracy
+    
+    def _calculateSmothedInaccuracy(self, feature_tnsr, target_tnsr)->float:
+        """Calculates the mean absolute maximum fractional error for each sample.
+
+        Args:
+            feature_tnsr (nn.Tensor): features
+            target_tnsr (nn.Tensor): target
+
+        Returns:
+            accuracy (float)
+        """
+        prediction_tnsr = self.predict(feature_tnsr)
+        prediction_arr = prediction_tnsr.cpu().numpy()
+        target_arr = target_tnsr.cpu().numpy()
+        # Find deiviations handling small and large predictions
+        mae1_arr = np.max(np.abs(prediction_arr - target_arr) / target_arr, axis=1)
+        mae2_arr = np.max(np.abs(prediction_arr - target_arr) / prediction_arr, axis=1)
+        mae_arr = np.maximum(mae1_arr, mae2_arr)
+        # Smooth the inaccuracy
+        smoothed_inaccuracy = np.mean(mae_arr)
+        return smoothed_inaccuracy
     
     def fit(self, train_loader: DataLoader) -> RunnerResultPredict:
         """
@@ -120,12 +151,11 @@ class ModelRunnerNN(ModelRunner):
         self.feature_std_tnsr = calculate_std(is_feature=True).to(cn.DEVICE)
         self.target_std_tnsr = calculate_std(is_feature=False).to(cn.DEVICE)
         num_sample = full_feature_tnsr.size(0)
-        reconstruction_loss_weight = 1/torch.std(self.target_std_tnsr)
         # Initialize for training
         optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         self.model.train()
         losses = []
-        avg_loss = 0.0
+        avg_loss = 1e10
         epoch_loss = np.inf
         accuracies:list = []
         mi_hidden1_input_epochs:list = []
@@ -146,14 +176,25 @@ class ModelRunnerNN(ModelRunner):
                 idx_tnsr = permutation[iter*batch_size:(iter+1)*batch_size]
                 feature_tnsr = full_feature_tnsr[idx_tnsr]/self.feature_std_tnsr
                 target_tnsr = full_target_tnsr[idx_tnsr]/self.target_std_tnsr
+                # Add noise to features for denoising autoencoder
+                feature_tnsr = feature_tnsr + torch.randn_like(feature_tnsr) * self.noise_std
                 # Forward pass with a regularization loss
                 prediction_tnsr = self.model(feature_tnsr)
                 reconstruction_loss = self.criterion(prediction_tnsr, target_tnsr)
-                l1_loss = self._l1_regularization()
-                accuracy = self._calculateAccuracy(full_feature_tnsr, full_target_tnsr)
-                accuracy_loss = ACCURACY_WEIGHT*(1 - accuracy)
+                if self.is_accuracy_regularization:
+                    accuracy_loss = self._calculateSmothedInaccuracy(full_feature_tnsr, full_target_tnsr)
+                else:
+                    accuracy_loss = 0.0
+                if self.is_l1_regularization:
+                    l1_loss = self._l1_regularization()
+                else:
+                    l1_loss = 0.0
                 # FIXME: May need to scale the losses.
-                total_loss = reconstruction_loss_weight*reconstruction_loss + l1_loss + 0.1*accuracy_loss
+                total_loss = reconstruction_loss + l1_loss + 0.01*accuracy_loss
+                if False:
+                    print(f"epoch={epoch}, reconstruction_loss={reconstruction_loss.item():.4f}, "
+                            f"l1_loss={l1_loss:.4f}, accuracy_loss={accuracy_loss:.4f}",
+                            f"total_loss={total_loss.item():.4f}")
                 # Backward pass
                 optimizer.zero_grad()
                 total_loss.backward()

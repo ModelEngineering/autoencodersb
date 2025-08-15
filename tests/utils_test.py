@@ -96,5 +96,6 @@ def makeAutocoderData(num_sample:int=NUM_SAMPLE,
     dependent_columns = [f"D_k_{''.join(str_idxs[i])}" for i in range(num_dependent_feature-num_mm)]  # Consider MM
     columns = independent_columns + mm_columns + dependent_columns
     df = pd.DataFrame(feature_arr, columns=columns, dtype=np.float32)
-    dataloader = DataLoader(DatasetCSV(csv_input=df, target_column=None), batch_size=10)
+    batch_size = num_sample // 10
+    dataloader = DataLoader(DatasetCSV(csv_input=df, target_column=None), batch_size=batch_size)
     return dataloader

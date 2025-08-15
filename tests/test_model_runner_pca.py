@@ -4,7 +4,6 @@ from iplane.dataset_csv import DatasetCSV  # type: ignore
 from tests.utils_test import makeAutocoderData  # type: ignore
 
 import numpy as np  # type: ignore
-import torch
 from torch.utils.data import DataLoader
 import pandas as pd    # type: ignore
 from typing import cast
