@@ -97,9 +97,11 @@ class ModelRunnerNN(ModelRunner):
             accuracy (float)
         """
         prediction_tnsr = self.predict(feature_tnsr)
-        accuracy_tnsr = torch.abs(prediction_tnsr - target_tnsr)/target_tnsr <= self.max_fractional_error
+        accuracy1_tnsr = torch.abs(prediction_tnsr - target_tnsr)/target_tnsr <= self.max_fractional_error
+        accuracy2_tnsr = torch.abs(prediction_tnsr - target_tnsr)/prediction_tnsr <= self.max_fractional_error
+        accuracy_tnsr = accuracy1_tnsr & accuracy2_tnsr
         accurate_rows = torch.sum(accuracy_tnsr, dim=1) == accuracy_tnsr.shape[1]
-        accuracy = torch.sum(accurate_rows) / accurate_rows.shape[0]
+        accuracy = (torch.sum(accurate_rows) / accurate_rows.shape[0]).item()
         return accuracy
     
     def _calculateSmothedInaccuracy(self, feature_tnsr, target_tnsr)->float:
