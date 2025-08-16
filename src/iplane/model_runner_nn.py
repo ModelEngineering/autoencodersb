@@ -97,9 +97,7 @@ class ModelRunnerNN(ModelRunner):
             accuracy (float)
         """
         prediction_tnsr = self.predict(feature_tnsr)
-        accuracy1_tnsr = torch.abs(prediction_tnsr - target_tnsr)/target_tnsr <= self.max_fractional_error
-        accuracy2_tnsr = torch.abs(prediction_tnsr - target_tnsr)/prediction_tnsr <= self.max_fractional_error
-        accuracy_tnsr = accuracy1_tnsr & accuracy2_tnsr
+        accuracy_tnsr = torch.abs(prediction_tnsr - target_tnsr)/target_tnsr <= self.max_fractional_error
         accurate_rows = torch.sum(accuracy_tnsr, dim=1) == accuracy_tnsr.shape[1]
         accuracy = (torch.sum(accurate_rows) / accurate_rows.shape[0]).item()
         return accuracy
@@ -118,9 +116,7 @@ class ModelRunnerNN(ModelRunner):
         prediction_arr = prediction_tnsr.cpu().numpy()
         target_arr = target_tnsr.cpu().numpy()
         # Find deiviations handling small and large predictions
-        mae1_arr = np.max(np.abs(prediction_arr - target_arr) / target_arr, axis=1)
-        mae2_arr = np.max(np.abs(prediction_arr - target_arr) / prediction_arr, axis=1)
-        mae_arr = np.maximum(mae1_arr, mae2_arr)
+        mae_arr = np.max(np.abs(prediction_arr - target_arr) / target_arr, axis=1)
         # Smooth the inaccuracy
         smoothed_inaccuracy = np.mean(mae_arr)
         return smoothed_inaccuracy

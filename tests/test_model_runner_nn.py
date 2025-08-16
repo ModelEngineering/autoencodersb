@@ -13,8 +13,8 @@ import unittest
 
 IGNORE_TESTS = True
 IS_PLOT = True
-NUM_EPOCH = 1000
 NUM_EPOCH = 20000
+NUM_EPOCH = 1000
 
 TARGET_COLUMN = "target"  # Assuming the target column is named 'target'
 NUM_DEPENDENT_FEATURE = 6
