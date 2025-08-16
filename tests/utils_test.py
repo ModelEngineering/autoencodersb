@@ -8,12 +8,13 @@ import itertools
 import numpy as np  # type: ignore
 from torch.utils.data import DataLoader
 import pandas as pd    # type: ignore
-from typing import cast
+from typing import cast, Optional, Tuple
 
 IGNORE_TESTS = True
 IS_PLOT = True
 NUM_EPOCH = 5
 NUM_EPOCH = 5000
+BATCH_SIZE_FRACTION = 0.1  # Fraction of the number of samples to use as batch size
 
 TARGET_COLUMN = "target"  # Assuming the target column is named 'target'
 NUM_INDEPENDENT_FEATURE = 2
@@ -27,7 +28,8 @@ def makeAutocoderData(num_sample:int=NUM_SAMPLE,
         num_independent_feature:int=NUM_INDEPENDENT_FEATURE,
         num_value:int=10,
         noise_std:float=0.0,
-        is_multiplier: bool = True) -> DataLoader:
+        multiplier_dct: Optional[dict]=None,
+        ) -> Tuple[DataLoader, dict]:
     """Generates a data loader with a specified number of independent and dependent features.
     The first num_independent_feature columns are independent features,
     and the last num_dependent_feature columns are dependent features.
@@ -38,11 +40,14 @@ def makeAutocoderData(num_sample:int=NUM_SAMPLE,
         num_dependent_feature (int): Number of dependent features.
         num_independent_feature (int): Number of independent features.
         num_value (int): Range of values for the independent features.
-        is_multiplier (bool): Whether to include a multiplier for the dependent features.
+        multiplier_dct (Optional[dict]): Dictionary of multipliers for specific dependent features.
     
     Returns:
         DataLoader: DataLoader containing the generated dataset.
     """
+    if multiplier_dct is None:
+        multiplier_dct = {}
+    #
     num_feature = num_dependent_feature + num_independent_feature
     arr = np.random.randint(1, 11, (num_sample, num_feature)).astype(np.float32)
     # Make the arrays
@@ -57,6 +62,7 @@ def makeAutocoderData(num_sample:int=NUM_SAMPLE,
     [cast(list, x).sort() for x in sorted_term_idxs]  # Sort each term index
     term_idxs:list = []
     # Eliminate duplicates
+    # FIXME: This is a bit inefficient, but it works for small numbers of features.
     for sorted_term_idx in sorted_term_idxs:
         is_duplicate = False
         for term_idx in term_idxs:
@@ -77,11 +83,7 @@ def makeAutocoderData(num_sample:int=NUM_SAMPLE,
     feature_arrs = list(independent_arr.T)
     [feature_arrs.append(x) for x in mm_arrs]  # type: ignore
     for sorted_term_idx in term_idxs:
-        if is_multiplier:
-            mult = np.random.randint(1, num_value+1)
-        else:
-            mult = 1
-        arr = np.ones(num_sample, dtype=np.float32)*mult
+        arr = np.ones(num_sample, dtype=np.float32)
         for idx in sorted_term_idx:
             arr = (independent_arr[:, idx]) * arr
         feature_arrs.append(arr)
@@ -96,6 +98,16 @@ def makeAutocoderData(num_sample:int=NUM_SAMPLE,
     dependent_columns = [f"D_k_{''.join(str_idxs[i])}" for i in range(num_dependent_feature-num_mm)]  # Consider MM
     columns = independent_columns + mm_columns + dependent_columns
     df = pd.DataFrame(feature_arr, columns=columns, dtype=np.float32)
-    batch_size = num_sample // 10
+    # Apply multipliers
+    if len(multiplier_dct) == 0:
+        for column in independent_columns + mm_columns:
+            multiplier_dct[column] = 1
+        for column in dependent_columns:
+            multiplier_dct[column] = np.random.randint(1, num_value+1, 1)[0]
+    #
+    for (key, multiplier) in multiplier_dct.items():
+        df[key] = multiplier*df[key]
+    # Return the dataloader
+    batch_size = int(np.ceil(BATCH_SIZE_FRACTION*num_sample))
     dataloader = DataLoader(DatasetCSV(csv_input=df, target_column=None), batch_size=batch_size)
-    return dataloader
+    return dataloader, multiplier_dct
