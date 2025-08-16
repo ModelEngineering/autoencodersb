@@ -123,7 +123,10 @@ class ModelRunner(object):
         prediction_tnsr = self.predict(feature_tnsr)
         prediction_df = pd.DataFrame(prediction_tnsr.to(cn.CPU).numpy(), columns=columns)
         target_df = pd.DataFrame(target_tnsr.to(cn.CPU).numpy(), columns=columns)
-        plot_df = (prediction_df - target_df)/target_df
+        numerator_arr = np.abs(prediction_df - target_df)/target_df
+        arr1 = numerator_arr/target_df.values
+        arr2 = numerator_arr/prediction_df.values
+        plot_df = pd.DataFrame(np.maximum(arr1, arr2), columns=columns)
         plot_df['class'] = "relative error"
         # Plot
         if ax is None:
