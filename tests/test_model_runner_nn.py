@@ -16,14 +16,18 @@ IGNORE_TESTS = True
 IS_PLOT = True
 NUM_EPOCH = 2000
 NUM_EPOCH = 20000
-
 TARGET_COLUMN = "target"  # Assuming the target column is named 'target'
 NUM_DEPENDENT_FEATURE = 6
 NUM_OUTPUT_FEATURE = 2
 NUM_INPUT_FEATURE = NUM_DEPENDENT_FEATURE + NUM_OUTPUT_FEATURE
 NUM_SAMPLE = 1000
-MODEL = Autoencoder(layer_dimensions=[NUM_INPUT_FEATURE, 10*NUM_INPUT_FEATURE,
+
+def makeModel():
+    """Creates a model for testing."""
+    return Autoencoder(layer_dimensions=[NUM_INPUT_FEATURE, 10*NUM_INPUT_FEATURE,
         10*NUM_OUTPUT_FEATURE, NUM_OUTPUT_FEATURE])  # Example model
+
+MODEL = makeModel()
 TRAIN_DL, dct = makeAutocoderData(num_sample=NUM_SAMPLE, num_independent_feature=NUM_OUTPUT_FEATURE,
         num_dependent_feature=NUM_DEPENDENT_FEATURE, num_value=10)
 TEST_DL = makeAutocoderData(num_sample=1000, num_independent_feature=NUM_OUTPUT_FEATURE,
@@ -64,19 +68,28 @@ class TestModelRunner(unittest.TestCase):
         self.assertIsInstance(evaluate_result.losses, list)
     
     def testplotEvaluate(self):
-        #if IGNORE_TESTS:
-        #    return
+        if IGNORE_TESTS:
+            return
         runner_result_fit = self.runner.fit(TRAIN_DL)
         self.runner.plotEvaluate(TEST_DL, is_plot=IS_PLOT)
 
     def testSerializeDeserialize(self):
-        if IGNORE_TESTS:
-            return
+        #if IGNORE_TESTS:
+        #    return
         runner = ModelRunnerNN(model=MODEL, num_epoch=NUM_EPOCH,
                 learning_rate=1e-5, is_normalized=True,
                 max_fractional_error=0.1)
         runner.serialize(SERIALIZE_PATH)
-        runner = ModelRunnerNN.deserialize(SERIALIZE_PATH)
+        model = makeModel()
+        new_runner = ModelRunnerNN.deserialize(model, SERIALIZE_PATH)
+        self.assertTrue(new_runner.isSameModel(runner.model))
+        import pdb; pdb.set_trace()
+    
+    def testIsSameModel(self):
+        if IGNORE_TESTS:
+            return
+        self.assertTrue(self.runner.isSameModel(self.runner.model))
+        self.assertFalse(self.runner.isSameModel(makeModel()))
 
 if __name__ == '__main__':
     unittest.main()

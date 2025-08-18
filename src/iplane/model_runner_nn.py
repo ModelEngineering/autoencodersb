@@ -12,7 +12,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm  # type: ignore
-from typing import cast
+from typing import cast, Optional
 
 
 ACCURACY_WEIGHT = 1  # Weight in loss function for accuracy
@@ -73,6 +73,8 @@ class ModelRunnerNN(ModelRunner):
         self.noise_std = noise_std
         self.is_l1_regularization = is_l1_regularization
         self.is_accuracy_regularization = is_accuracy_regularization
+        #
+        self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
     def _l1_regularization(self, lambda_l1:float = 0.001):
         # Regularization based on parameter values
@@ -145,7 +147,6 @@ class ModelRunnerNN(ModelRunner):
         self.target_std_tnsr = calculate_std(is_feature=False).to(cn.DEVICE)
         num_sample = full_feature_tnsr.size(0)
         # Initialize for training
-        optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         self.model.train()
         losses = []
         avg_loss = 1e10
@@ -170,10 +171,6 @@ class ModelRunnerNN(ModelRunner):
                 # Transform the feature and target tensors
                 feature_tnsr = self.transform(full_feature_tnsr[idx_tnsr])
                 target_tnsr = self.transform(full_target_tnsr[idx_tnsr])
-                """ unitized_feature_tnsr = self.unitize(full_feature_tnsr[idx_tnsr])
-                feature_tnsr = unitized_feature_tnsr / self.feature_std_tnsr
-                unitized_target_tnsr = self.unitize(full_target_tnsr[idx_tnsr])
-                target_tnsr = unitized_target_tnsr[idx_tnsr] / self.target_std_tnsr"""
                 # Add noise to target for denoising autoencoder
                 target_tnsr = target_tnsr + torch.randn_like(target_tnsr) * self.noise_std
                 # Forward pass with a regularization loss
@@ -194,9 +191,9 @@ class ModelRunnerNN(ModelRunner):
                             f"l1_loss={l1_loss:.4f}, accuracy_loss={accuracy_loss:.4f}",
                             f"total_loss={total_loss.item():.4f}")
                 # Backward pass
-                optimizer.zero_grad()
+                self.optimizer.zero_grad()
                 total_loss.backward()
-                optimizer.step()
+                self.optimizer.step()
                 #
                 epoch_loss += total_loss.item()
             # Record results of epoch
@@ -236,48 +233,55 @@ class ModelRunnerNN(ModelRunner):
         """Check if the model is on MPS device."""
         return self.get_model_device().type == 'mps'
 
-    # FIXME: Need more complex data to handle all parameters 
     def is_model_on_cpu(self) -> bool:
         """Check if the model is on CPU."""
         return self.get_model_device().type == cn.CPU
 
-    def serialize(self, path: str):
-        """Serializes the model runner to a file."""
-        joblib.dump({
+    def serialize(self, path: str, epoch: Optional[int] = None,
+            loss_tnsr: torch.Tensor = torch.tensor(np.inf)):
+        """Serializes a model checkpoint."""
+        checkpoint_dct = {
             'model': self.model.state_dict(),
             'num_epoch': self.num_epoch,
             'learning_rate': self.learning_rate,
             'is_normalized': self.is_normalized,
+            'dataloader': self.dataloader,
             'max_fractional_error': self.max_fractional_error,
             'criterion': self.criterion,
             'noise_std': self.noise_std,
             'is_l1_regularization': self.is_l1_regularization,
             'is_accuracy_regularization': self.is_accuracy_regularization,
-            'feature_std_tnsr': self.feature_std_tnsr.cpu().numpy(),
-            'target_std_tnsr': self.target_std_tnsr.cpu().numpy()
-        }, path)
+            'feature_std_tnsr': self.feature_std_tnsr.cpu(),
+            'target_std_tnsr': self.target_std_tnsr.cpu(),
+            'epoch': epoch,
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'loss': loss_tnsr,
+        }
+        torch.save(checkpoint_dct, path)
 
     @classmethod
-    def deserialize(cls, path: str) -> 'ModelRunnerNN':
+    def deserialize(cls, untrained_model: nn.Module, path: str) -> 'ModelRunnerNN':
         """Deserializes the model runner from a file."""
-        context_dct = joblib.load(path)
-        model = nn.Module()  # Placeholder for the actual model, should be replaced with the actual model class
-        model.load_state_dict(context_dct['model'])
-        num_epoch = context_dct['num_epoch']
-        learning_rate = context_dct['learning_rate']
-        is_normalized = context_dct['is_normalized']
-        max_fractional_error = context_dct['max_fractional_error']
-        noise_std = context_dct['noise_std']
-        is_l1_regularization = context_dct['is_l1_regularization']
-        is_accuracy_regularization = context_dct['is_accuracy_regularization']
-        runner = cls(model=model, num_epoch=num_epoch, learning_rate=learning_rate,
+        checkpoint_dct = torch.load(path, weights_only=False)
+        untrained_model.load_state_dict(checkpoint_dct['model_state_dict'])
+        num_epoch = checkpoint_dct['num_epoch']
+        learning_rate = checkpoint_dct['learning_rate']
+        is_normalized = checkpoint_dct['is_normalized']
+        max_fractional_error = checkpoint_dct['max_fractional_error']
+        noise_std = checkpoint_dct['noise_std']
+        is_l1_regularization = checkpoint_dct['is_l1_regularization']
+        is_accuracy_regularization = checkpoint_dct['is_accuracy_regularization']
+        dataloader = checkpoint_dct.get('dataloader', None)
+        runner = cls(model=untrained_model, num_epoch=num_epoch, learning_rate=learning_rate,
                 is_normalized=is_normalized, max_fractional_error=max_fractional_error,
                 noise_std=noise_std, is_l1_regularization=is_l1_regularization,
                 is_accuracy_regularization=is_accuracy_regularization,
-                criterion=context_dct['criterion'])
+                criterion=checkpoint_dct['criterion'])
         #
-        feature_std_tnsr = torch.tensor(context_dct['feature_std_tnsr'])
-        target_std_tnsr = torch.tensor(context_dct['target_std_tnsr'])
+        feature_std_tnsr = checkpoint_dct['feature_std_tnsr'].detach().clone()
+        target_std_tnsr = checkpoint_dct['target_std_tnsr'].detach().clone()
         runner.feature_std_tnsr = feature_std_tnsr.to(cn.DEVICE)
         runner.target_std_tnsr = target_std_tnsr.to(cn.DEVICE)
+        runner.dataloader = dataloader
         return runner

@@ -1,6 +1,7 @@
 '''Calculates accuracy statistics for fractional errors.'''
 
 from collections import namedtuple
+import torch
 import pandas as pd  # type: ignore
 import numpy as np
 import matplotlib.pyplot as plt
@@ -17,12 +18,14 @@ AccuracyResult = namedtuple('AccuracyResult', ['accuracy', 'mean_absolute_error'
 
 class AccuracyCalculator(object):
     """Calculates accuracy statistics for fractional errors."""
-    
-    def __init__(self, error_arr: np.ndarray):
+
+    def __init__(self, error_arr: Union[torch.Tensor, np.ndarray]):
         """
         Args:
             error_arr (np.ndarray): Array of fractional errors.
         """
+        if isinstance(error_arr, torch.Tensor):
+            error_arr = error_arr.numpy()
         self.error_arr = error_arr
         self.accuracy_result : Union[AccuracyResult, None] = None
 
@@ -47,7 +50,7 @@ class AccuracyCalculator(object):
         return self.accuracy_result
     
     @classmethod
-    def getStatistics(cls, error_arr: np.ndarray,
+    def getStatistics(cls, error_arr: Union[torch.Tensor, np.ndarray],
             percentiles: List[float]=PERCENTILE_STATISTICS) -> List[float]:
         """
         Get accuracy statistics for the given error array.
@@ -59,6 +62,8 @@ class AccuracyCalculator(object):
         Returns:
             List[float]: List of accuracy statistics for the specified percentiles.
         """
+        if isinstance(error_arr, torch.Tensor):
+            error_arr = error_arr.numpy()
         ser = pd.Series(error_arr)
         results = ser.quantile(percentiles).values.tolist() # type: ignore
         return results

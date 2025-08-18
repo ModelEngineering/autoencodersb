@@ -2,11 +2,13 @@ from iplane.accuracy_calculator import AccuracyCalculator, AccuracyResult, PERCE
 
 import numpy as np  # type: ignore
 import pandas as pd    # type: ignore
+import torch
 import unittest
 
 IGNORE_TESTS = False
 IS_PLOT = False
 ERROR_ARR = np.random.rand(1000)  # Simulated fractional errors
+ERROR_TNSR = torch.tensor(ERROR_ARR, dtype=torch.float32)  # Convert to tensor for testing
 
 
 class TestAccuracyCalculator(unittest.TestCase):
@@ -23,9 +25,17 @@ class TestAccuracyCalculator(unittest.TestCase):
     def testCalculateCDF(self):
         if IGNORE_TESTS:
             return
-        result = self.calculator.calculateCDF()
-        self.assertIsInstance(result, AccuracyResult)
-        self.assertIsInstance(result.cdf_df, pd.DataFrame)
+        result1 = self.calculator.calculateCDF()
+        self.assertIsInstance(result1, AccuracyResult)
+        self.assertIsInstance(result1.cdf_df, pd.DataFrame)
+        #
+        calculator = AccuracyCalculator(ERROR_TNSR)
+        result2 = calculator.calculateCDF()
+        self.assertIsInstance(result2, AccuracyResult)
+        self.assertIsInstance(result2.cdf_df, pd.DataFrame)
+        #
+        diff_df = ((result1.cdf_df['cdf'] - result2.cdf_df['cdf'])**2).sum()
+        self.assertAlmostEqual(diff_df, 0.0, places=5, msg="CDFs should be equal for same data")
 
     def testGetStatistics(self):
         if IGNORE_TESTS:

@@ -3,6 +3,7 @@
 from iplane import constants as cn
 
 from collections import namedtuple
+from copy import deepcopy
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd  # type: ignore
@@ -172,16 +173,18 @@ class ModelRunner(object):
         if is_plot:
             plt.show()
 
-    def serialize(self, path: str):
+    """ def serialize(self, path: str):
         raise NotImplementedError("Subclasses must implement this method.")
     
     @classmethod
-    def deserialize(cls, path: str) -> 'ModelRunner':
-        """Deserializes the model from a file."""
-        raise NotImplementedError("Subclasses must implement this method.")
+    def deserialize(cls, untrained_model: nn.Module, path: str) -> 'ModelRunner':
+        # Deserializes the model from a file.
+        raise NotImplementedError("Subclasses must implement this method.") """
 
     def indexQuadraticColumns(self, tnsr: torch.Tensor) -> List[int]:
         """Returns the indices of the quadratic columns in a tensor."""
+        if self.dataloader is None:
+            import pdb; pdb.set_trace()  # type: ignore
         df = self.dataloader.dataset.data_df  # type: ignore
         indices = [list(df.columns).index(c) for c in df.columns if c.count("_") == 3]
         return indices
@@ -201,6 +204,24 @@ class ModelRunner(object):
         new_tnsr[:, indices] = tensor[:, indices]*tensor[:, indices]
         denormalized_tensor = new_tnsr * self.feature_std_tnsr
         return denormalized_tensor
+    
+    def isSameModel(self, other: nn.Module) -> bool:
+        """Check if two models have identical parameters"""
+        self_model = deepcopy(self.model).to(cn.CPU)
+        other_model = deepcopy(other).to(cn.CPU)
+        state_dict1 = self_model.state_dict()
+        state_dict2 = other_model.state_dict()
+        
+        # Check if they have the same keys
+        if set(state_dict1.keys()) != set(state_dict2.keys()):
+            return False
+        
+        # Check if parameter values are equal
+        for key in state_dict1.keys():
+            if not torch.equal(state_dict1[key], state_dict2[key]):
+                return False
+        
+        return True
     
     #################################################
     
