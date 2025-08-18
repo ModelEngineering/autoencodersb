@@ -4,17 +4,15 @@ from xml.parsers.expat import model
 import iplane.constants as cn  # type: ignore
 from iplane.model_runner import ModelRunner, RunnerResult  # type: ignore
 
-from collections import namedtuple
-import matplotlib.pyplot as plt
+import joblib # type: ignore
 import numpy as np
-import pandas as pd  # type: ignore
 from pandas.plotting import parallel_coordinates # type: ignore
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm  # type: ignore
-from typing import Optional, Tuple, cast
+from typing import cast
 
 
 ACCURACY_WEIGHT = 1  # Weight in loss function for accuracy
@@ -45,7 +43,7 @@ class RunnerResultFit(RunnerResultPredict):
 class ModelRunnerNN(ModelRunner):
     # Runner for Autoencoder
 
-    def __init__(self, model: Optional[nn.Module]=None, num_epoch:int=3, learning_rate:float=1e-3,
+    def __init__(self, model: nn.Module, num_epoch:int=3, learning_rate:float=1e-3,
                 criterion:nn.Module=nn.MSELoss(), max_fractional_error: float=0.10,
                 is_normalized:bool=True, 
                 noise_std: float=0.1, is_l1_regularization:bool=True, is_accuracy_regularization:bool=True,
@@ -66,9 +64,8 @@ class ModelRunnerNN(ModelRunner):
             is_report (bool, optional): Print text for progress.
                                         Defaults to False.
         """
-        super().__init__(criterion=criterion, is_report=is_report)
-        if model is not None:
-            self.model = model.to(cn.DEVICE)
+        super().__init__(model, criterion=criterion, is_report=is_report)
+        self.model = model.to(cn.DEVICE)
         self.num_epoch = num_epoch
         self.learning_rate = learning_rate
         self.is_normalized = is_normalized
@@ -76,9 +73,6 @@ class ModelRunnerNN(ModelRunner):
         self.noise_std = noise_std
         self.is_l1_regularization = is_l1_regularization
         self.is_accuracy_regularization = is_accuracy_regularization
-        # Calculated state
-        self.feature_std_tnsr = torch.tensor([np.nan])
-        self.target_std_tnsr = torch.tensor([np.nan])
 
     def _l1_regularization(self, lambda_l1:float = 0.001):
         # Regularization based on parameter values
@@ -120,7 +114,7 @@ class ModelRunnerNN(ModelRunner):
         # Smooth the inaccuracy
         smoothed_inaccuracy = np.mean(mae_arr)
         return smoothed_inaccuracy
-    
+
     def fit(self, train_loader: DataLoader) -> RunnerResultPredict:
         """
         Train the model. All calculations are on the accelerator device.
@@ -130,6 +124,7 @@ class ModelRunnerNN(ModelRunner):
         Returns:
             RunnerResult: losses and number of epochs
         """
+        self.dataloader = train_loader
         full_feature_tnsr = torch.cat([x[0] for x in train_loader]).to(cn.DEVICE)
         full_target_tnsr = torch.cat([x[1] for x in train_loader]).to(cn.DEVICE)
         ##
@@ -172,10 +167,15 @@ class ModelRunnerNN(ModelRunner):
             #for (feature_tnsr, target_tnsr) in train_loader:
             for iter in range(num_batch):
                 idx_tnsr = permutation[iter*batch_size:(iter+1)*batch_size]
-                feature_tnsr = full_feature_tnsr[idx_tnsr]/self.feature_std_tnsr
-                target_tnsr = full_target_tnsr[idx_tnsr]/self.target_std_tnsr
-                # Add noise to features for denoising autoencoder
-                feature_tnsr = feature_tnsr + torch.randn_like(feature_tnsr) * self.noise_std
+                # Transform the feature and target tensors
+                feature_tnsr = self.transform(full_feature_tnsr[idx_tnsr])
+                target_tnsr = self.transform(full_target_tnsr[idx_tnsr])
+                """ unitized_feature_tnsr = self.unitize(full_feature_tnsr[idx_tnsr])
+                feature_tnsr = unitized_feature_tnsr / self.feature_std_tnsr
+                unitized_target_tnsr = self.unitize(full_target_tnsr[idx_tnsr])
+                target_tnsr = unitized_target_tnsr[idx_tnsr] / self.target_std_tnsr"""
+                # Add noise to target for denoising autoencoder
+                target_tnsr = target_tnsr + torch.randn_like(target_tnsr) * self.noise_std
                 # Forward pass with a regularization loss
                 prediction_tnsr = self.model(feature_tnsr)
                 reconstruction_loss = self.criterion(prediction_tnsr, target_tnsr)
@@ -222,10 +222,11 @@ class ModelRunnerNN(ModelRunner):
         self.model.eval()
         if self.is_model_on_cpu():
             self.model.to(cn.DEVICE)
-        device_feature_tnsr = feature_tnsr.to(cn.DEVICE)/self.feature_std_tnsr.to(cn.DEVICE)
+        transformed_feature_tnsr = self.transform(feature_tnsr.to(cn.DEVICE))
         with torch.no_grad():
-            prediction_tnsr = self.model(device_feature_tnsr)
-        return self.feature_std_tnsr.to(cn.DEVICE)*prediction_tnsr
+            transformed_prediction_tnsr = self.model(transformed_feature_tnsr)
+            prediction_tnsr = self.untransform(transformed_prediction_tnsr)
+        return prediction_tnsr
 
     def get_model_device(self) -> torch.device:
         """Get the device where the model is currently located."""
@@ -234,7 +235,49 @@ class ModelRunnerNN(ModelRunner):
     def is_model_on_mps(self) -> bool:
         """Check if the model is on MPS device."""
         return self.get_model_device().type == 'mps'
-    
+
+    # FIXME: Need more complex data to handle all parameters 
     def is_model_on_cpu(self) -> bool:
         """Check if the model is on CPU."""
         return self.get_model_device().type == cn.CPU
+
+    def serialize(self, path: str):
+        """Serializes the model runner to a file."""
+        joblib.dump({
+            'model': self.model.state_dict(),
+            'num_epoch': self.num_epoch,
+            'learning_rate': self.learning_rate,
+            'is_normalized': self.is_normalized,
+            'max_fractional_error': self.max_fractional_error,
+            'criterion': self.criterion,
+            'noise_std': self.noise_std,
+            'is_l1_regularization': self.is_l1_regularization,
+            'is_accuracy_regularization': self.is_accuracy_regularization,
+            'feature_std_tnsr': self.feature_std_tnsr.cpu().numpy(),
+            'target_std_tnsr': self.target_std_tnsr.cpu().numpy()
+        }, path)
+
+    @classmethod
+    def deserialize(cls, path: str) -> 'ModelRunnerNN':
+        """Deserializes the model runner from a file."""
+        context_dct = joblib.load(path)
+        model = nn.Module()  # Placeholder for the actual model, should be replaced with the actual model class
+        model.load_state_dict(context_dct['model'])
+        num_epoch = context_dct['num_epoch']
+        learning_rate = context_dct['learning_rate']
+        is_normalized = context_dct['is_normalized']
+        max_fractional_error = context_dct['max_fractional_error']
+        noise_std = context_dct['noise_std']
+        is_l1_regularization = context_dct['is_l1_regularization']
+        is_accuracy_regularization = context_dct['is_accuracy_regularization']
+        runner = cls(model=model, num_epoch=num_epoch, learning_rate=learning_rate,
+                is_normalized=is_normalized, max_fractional_error=max_fractional_error,
+                noise_std=noise_std, is_l1_regularization=is_l1_regularization,
+                is_accuracy_regularization=is_accuracy_regularization,
+                criterion=context_dct['criterion'])
+        #
+        feature_std_tnsr = torch.tensor(context_dct['feature_std_tnsr'])
+        target_std_tnsr = torch.tensor(context_dct['target_std_tnsr'])
+        runner.feature_std_tnsr = feature_std_tnsr.to(cn.DEVICE)
+        runner.target_std_tnsr = target_std_tnsr.to(cn.DEVICE)
+        return runner

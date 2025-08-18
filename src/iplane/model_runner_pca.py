@@ -1,6 +1,8 @@
 from iplane.model_runner import ModelRunner, RunnerResult # type: ignore
 
+import joblib # type: ignore
 import numpy as np
+import os
 import seaborn as sns # type: ignore
 from sklearn.decomposition import PCA # type:ignore
 from sklearn.preprocessing import StandardScaler # type:ignore
@@ -42,6 +44,7 @@ class ModelRunnerPCA(ModelRunner):
         RunnerResult
             Result of the fitting process
         """
+        self.dataloader = train_loader
         feature_tnsr, target_tnsr = self.getFeatureTarget(train_loader)
         # Standardize the data
         x_scaled = self.scaler.fit_transform(feature_tnsr.numpy())
@@ -100,3 +103,23 @@ class ModelRunnerPCA(ModelRunner):
             Predicted data
         """
         return self._decode(self._encode(feature_tnsr))
+    
+    def serialize(self, path:str):
+        """Serializes the PCA model to a file."""
+        joblib.dump({
+            'n_components': self.n_components,
+            'random_state': self.random_state,
+            'scaler': self.scaler,
+            'pca': self.pca
+        }, path)
+
+    @classmethod
+    def deserialize(cls, path:str) -> 'ModelRunnerPCA':
+        """Deserializes the PCA model from a file."""
+        context_dct = joblib.load(path)
+        runner = cls()
+        runner.scaler = context_dct['scaler']
+        runner.pca = context_dct['pca']
+        runner.n_components = context_dct['n_components']
+        runner.random_state = context_dct['random_state']
+        return runner

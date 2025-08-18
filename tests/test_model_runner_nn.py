@@ -6,6 +6,7 @@ import iplane.constants as cn  # type: ignore
 from tests.utils_test import makeAutocoderData  # type: ignore
 
 import numpy as np  # type: ignore
+import os
 import torch
 from torch.utils.data import DataLoader
 import pandas as pd    # type: ignore
@@ -13,8 +14,8 @@ import unittest
 
 IGNORE_TESTS = True
 IS_PLOT = True
+NUM_EPOCH = 2000
 NUM_EPOCH = 20000
-NUM_EPOCH = 10000
 
 TARGET_COLUMN = "target"  # Assuming the target column is named 'target'
 NUM_DEPENDENT_FEATURE = 6
@@ -28,6 +29,8 @@ TRAIN_DL, dct = makeAutocoderData(num_sample=NUM_SAMPLE, num_independent_feature
 TEST_DL = makeAutocoderData(num_sample=1000, num_independent_feature=NUM_OUTPUT_FEATURE,
                             num_dependent_feature=NUM_DEPENDENT_FEATURE, num_value=10,
                             multiplier_dct=dct)[0]
+TEST_DIR = os.path.abspath(os.path.dirname(__file__))
+SERIALIZE_PATH = os.path.join(TEST_DIR, 'model_runner_nn_test.pkl')
 
 
 class TestModelRunner(unittest.TestCase):
@@ -65,6 +68,15 @@ class TestModelRunner(unittest.TestCase):
         #    return
         runner_result_fit = self.runner.fit(TRAIN_DL)
         self.runner.plotEvaluate(TEST_DL, is_plot=IS_PLOT)
+
+    def testSerializeDeserialize(self):
+        if IGNORE_TESTS:
+            return
+        runner = ModelRunnerNN(model=MODEL, num_epoch=NUM_EPOCH,
+                learning_rate=1e-5, is_normalized=True,
+                max_fractional_error=0.1)
+        runner.serialize(SERIALIZE_PATH)
+        runner = ModelRunnerNN.deserialize(SERIALIZE_PATH)
 
 if __name__ == '__main__':
     unittest.main()

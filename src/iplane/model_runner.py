@@ -10,13 +10,15 @@ from pandas.plotting import parallel_coordinates # type: ignore
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from typing import cast, Tuple, List, Optional
+from typing import cast, Tuple, List, Optional, Union
 
 
 """
 Subclasses must implement the following methods:
     - fit: Train the model on the training data.
     - predict: Predict the target for the features.
+    - serialize: Serialize the model to a file.
+    - deserialize: Deserialize the model from a file.
 """
 
 class RunnerResult(object):
@@ -35,14 +37,20 @@ class RunnerResult(object):
 class ModelRunner(object):
     # Runner for Autoencoder
 
-    def __init__(self, criterion:nn.Module=nn.MSELoss(), is_report:bool=False):
+    def __init__(self, model:nn.Module, criterion:nn.Module=nn.MSELoss(), is_report:bool=False):
         """
         Args:
+            model (nn.Module): The model to train.
             criterion (nn.Module): Loss function to use for training.
             is_report (bool): Whether to print progress during training.    
         """
+        self.model = model
         self.criterion = criterion
         self.is_report = is_report
+        self.dataloader: Union[None, DataLoader] = None
+        # Calculated state
+        self.feature_std_tnsr = torch.tensor([np.nan])  # Calculated by subclass
+        self.target_std_tnsr = torch.tensor([np.nan])   # Calculated by subclass
 
     @staticmethod
     def getFeatureTarget(loader: DataLoader) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -163,3 +171,49 @@ class ModelRunner(object):
         plt.tight_layout()
         if is_plot:
             plt.show()
+
+    def serialize(self, path: str):
+        raise NotImplementedError("Subclasses must implement this method.")
+    
+    @classmethod
+    def deserialize(cls, path: str) -> 'ModelRunner':
+        """Deserializes the model from a file."""
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    def indexQuadraticColumns(self, tnsr: torch.Tensor) -> List[int]:
+        """Returns the indices of the quadratic columns in a tensor."""
+        df = self.dataloader.dataset.data_df  # type: ignore
+        indices = [list(df.columns).index(c) for c in df.columns if c.count("_") == 3]
+        return indices
+    
+    def transform(self, tensor: torch.Tensor) -> torch.Tensor:
+        """Transforms the tensor before prediction."""
+        normalized_tnsr = tensor / self.feature_std_tnsr
+        indices = self.indexQuadraticColumns(normalized_tnsr)
+        new_tnsr = normalized_tnsr.clone()
+        new_tnsr[:, indices] = torch.sqrt(normalized_tnsr[:, indices])
+        return new_tnsr
+
+    def untransform(self, tensor: torch.Tensor) -> torch.Tensor:
+        """Inverts transform after prediction."""
+        indices = self.indexQuadraticColumns(tensor)
+        new_tnsr = tensor.clone()
+        new_tnsr[:, indices] = tensor[:, indices]*tensor[:, indices]
+        denormalized_tensor = new_tnsr * self.feature_std_tnsr
+        return denormalized_tensor
+    
+    #################################################
+    
+    def deprecated_unitize(self, tensor: torch.Tensor) -> torch.Tensor:
+        """Takes the square root of quadratic columns of a tensor."""
+        indices = self.indexQuadraticColumns(tensor)
+        new_tnsr = tensor.clone()
+        new_tnsr[:, indices] = torch.sqrt(tensor[:, indices])
+        return new_tnsr
+    
+    def deprecated_deunitize(self, tensor: torch.Tensor) -> torch.Tensor:
+        """Squares quadratic columns of a tensor."""
+        indices = self.indexQuadraticColumns(tensor)
+        new_tnsr = tensor.clone()
+        new_tnsr[:, indices] = tensor[:, indices]*tensor[:, indices]
+        return new_tnsr
