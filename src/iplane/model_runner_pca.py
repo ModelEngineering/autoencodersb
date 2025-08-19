@@ -24,13 +24,13 @@ class ModelRunnerPCA(ModelRunner):
             random_state (int, optional): Random state for reproducibility. Defaults to 42.
             n_components (int, optional): Number of PCA components. Defaults to 2.
         """
-        super().__init__(**kwargs)
+        super().__init__(self, **kwargs)
         self.n_components = n_components
         self.random_state = random_state
         self.scaler = StandardScaler()
         self.pca = PCA(n_components=self.n_components, random_state=self.random_state)
     
-    def fit(self, train_loader: DataLoader) -> RunnerResult:
+    def fit(self, train_dl: DataLoader) -> RunnerResult:
         """
         Fit PCA and transform the data
         
@@ -44,8 +44,8 @@ class ModelRunnerPCA(ModelRunner):
         RunnerResult
             Result of the fitting process
         """
-        self.dataloader = train_loader
-        feature_tnsr, target_tnsr = self.getFeatureTarget(train_loader)
+        self.train_dl = train_dl
+        feature_tnsr, target_tnsr = self.getFeatureTarget(train_dl)
         # Standardize the data
         x_scaled = self.scaler.fit_transform(feature_tnsr.numpy())
         self.pca.fit(x_scaled)

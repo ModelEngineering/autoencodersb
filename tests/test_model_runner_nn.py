@@ -83,7 +83,6 @@ class TestModelRunner(unittest.TestCase):
         model = makeModel()
         new_runner = ModelRunnerNN.deserialize(model, SERIALIZE_PATH)
         self.assertTrue(new_runner.isSameModel(runner.model))
-        import pdb; pdb.set_trace()
     
     def testIsSameModel(self):
         if IGNORE_TESTS:

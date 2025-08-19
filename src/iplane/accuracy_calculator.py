@@ -117,8 +117,8 @@ class AccuracyCalculator(object):
                     linewidth=1, markersize=1,
                     label=names[idx])
         ax.set_title('Cumulative Distribution Function (CDF) Comparison')
-        ax.set_xlabel('Error')
-        ax.set_ylabel('CDF')
+        ax.set_xlabel('max absolute sample error')
+        ax.set_ylabel('fraction of samples')
         ax.legend()
         if is_plot:
             plt.show()

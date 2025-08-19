@@ -1,10 +1,9 @@
 '''Running a model for a neural network.'''
 
-from xml.parsers.expat import model
 import iplane.constants as cn  # type: ignore
 from iplane.model_runner import ModelRunner, RunnerResult  # type: ignore
 
-import joblib # type: ignore
+from copy import deepcopy
 import numpy as np
 from pandas.plotting import parallel_coordinates # type: ignore
 import torch
@@ -74,11 +73,13 @@ class ModelRunnerNN(ModelRunner):
         self.is_l1_regularization = is_l1_regularization
         self.is_accuracy_regularization = is_accuracy_regularization
         #
+        self.train_dl = None  # Optional[DataLoader] used to train the model
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        self.last_epoch = 0 # Support for incremental training
 
     def _l1_regularization(self, lambda_l1:float = 0.001):
         # Regularization based on parameter values
-        l1_penalty = sum(param.abs().sum() for param in self.model.parameters())
+        l1_penalty = sum(param.abs().sum() for param in cast(nn.Module, self.model).parameters())
         return lambda_l1 * l1_penalty
 
     def _calculateAccuracy(self, feature_tnsr, target_tnsr)->float:
@@ -117,18 +118,29 @@ class ModelRunnerNN(ModelRunner):
         smoothed_inaccuracy = np.mean(mae_arr)
         return smoothed_inaccuracy
 
-    def fit(self, train_loader: DataLoader) -> RunnerResultPredict:
+    def fit(self, train_dl: Optional[DataLoader]=None, num_epoch: Optional[int]=None) -> RunnerResultPredict:
         """
         Train the model. All calculations are on the accelerator device.
+        Models can be fit incrementally.
+
 
         Args:
-            train_loader (DataLoader): DataLoader for training data
+            train_loader (DataLoader): DataLoader for training data. Preserved for subsequent iterations.
+            num_epoch (Optional[int]): Number of epochs to (incrementally) train. If None, uses the initial value.
         Returns:
             RunnerResult: losses and number of epochs
         """
-        self.dataloader = train_loader
-        full_feature_tnsr = torch.cat([x[0] for x in train_loader]).to(cn.DEVICE)
-        full_target_tnsr = torch.cat([x[1] for x in train_loader]).to(cn.DEVICE)
+        self.num_epoch = num_epoch if num_epoch is not None else self.num_epoch
+        if train_dl is None:
+            if self.train_dl is None:
+                raise ValueError("No training data provided. Please provide a DataLoader.")
+            else:
+                train_dl = self.train_dl
+        else:
+            self.train_dl = train_dl # type: ignore
+        train_dl = cast(DataLoader, train_dl)
+        full_feature_tnsr = torch.cat([x[0] for x in train_dl]).to(cn.DEVICE)
+        full_target_tnsr = torch.cat([x[1] for x in train_dl]).to(cn.DEVICE)
         ##
         def calculate_std(is_feature: bool) -> torch.Tensor:
             # is_feature: True for feature, False for target
@@ -147,7 +159,7 @@ class ModelRunnerNN(ModelRunner):
         self.target_std_tnsr = calculate_std(is_feature=False).to(cn.DEVICE)
         num_sample = full_feature_tnsr.size(0)
         # Initialize for training
-        self.model.train()
+        cast(nn.Module, self.model).train()
         losses = []
         avg_loss = 1e10
         epoch_loss = np.inf
@@ -156,16 +168,15 @@ class ModelRunnerNN(ModelRunner):
         mi_hidden2_output_epochs:list = []
         accuracy = 0.0
         epoch_loss = np.inf
-        batch_size = train_loader.batch_size
+        batch_size = train_dl.batch_size
         # Training loop
-        pbar = tqdm(range(self.num_epoch), desc=f"epochs (accuracy/-logloss={accuracy:.2f}/{avg_loss:.4f})")
+        pbar = tqdm(range(self.last_epoch, self.num_epoch), desc=f"epochs (accuracy/-logloss={accuracy:.2f}/{avg_loss:.4f})")
         for epoch in pbar:
             permutation = torch.randperm(num_sample)
             batch_size = cast(int, batch_size)
             num_batch = num_sample // batch_size
             pbar.set_description_str(f"epochs (accuracy/-logloss={accuracy:.2f}/{-np.log10(avg_loss):.4f})")
             epoch_loss = 0
-            #for (feature_tnsr, target_tnsr) in train_loader:
             for iter in range(num_batch):
                 idx_tnsr = permutation[iter*batch_size:(iter+1)*batch_size]
                 # Transform the feature and target tensors
@@ -174,7 +185,7 @@ class ModelRunnerNN(ModelRunner):
                 # Add noise to target for denoising autoencoder
                 target_tnsr = target_tnsr + torch.randn_like(target_tnsr) * self.noise_std
                 # Forward pass with a regularization loss
-                prediction_tnsr = self.model(feature_tnsr)
+                prediction_tnsr = cast(nn.Module, self.model)(feature_tnsr)
                 reconstruction_loss = self.criterion(prediction_tnsr, target_tnsr)
                 if self.is_accuracy_regularization:
                     accuracy_loss = self._calculateSmothedInaccuracy(full_feature_tnsr, full_target_tnsr)
@@ -186,10 +197,6 @@ class ModelRunnerNN(ModelRunner):
                     l1_loss = 0.0
                 # FIXME: May need to scale the losses.
                 total_loss = reconstruction_loss + l1_loss + 0.01*accuracy_loss
-                if False:
-                    print(f"epoch={epoch}, reconstruction_loss={reconstruction_loss.item():.4f}, "
-                            f"l1_loss={l1_loss:.4f}, accuracy_loss={accuracy_loss:.4f}",
-                            f"total_loss={total_loss.item():.4f}")
                 # Backward pass
                 self.optimizer.zero_grad()
                 total_loss.backward()
@@ -199,10 +206,11 @@ class ModelRunnerNN(ModelRunner):
             # Record results of epoch
             accuracy = self._calculateAccuracy(full_feature_tnsr, full_target_tnsr)
             accuracies.append(accuracy)
-            avg_loss = epoch_loss / len(train_loader)
+            avg_loss = epoch_loss / len(train_dl)
             losses.append(avg_loss)
             if self.is_report:
                 print(f'Epoch [{epoch+1}/{self.num_epoch}], Loss: {avg_loss:.4f}')
+        self.last_epoch = self.num_epoch
         #
         avg_loss = cast(float, np.mean(losses))
         return RunnerResultFit(avg_loss=avg_loss, losses=losses, num_epochs=self.num_epoch,
@@ -216,18 +224,19 @@ class ModelRunnerNN(ModelRunner):
         Returns:
             torch.Tensor: target predictions (on cn.DEVICE)
         """
-        self.model.eval()
+        model = cast(nn.Module, self.model)
+        model.eval()
         if self.is_model_on_cpu():
-            self.model.to(cn.DEVICE)
+            model.to(cn.DEVICE)
         transformed_feature_tnsr = self.transform(feature_tnsr.to(cn.DEVICE))
         with torch.no_grad():
-            transformed_prediction_tnsr = self.model(transformed_feature_tnsr)
+            transformed_prediction_tnsr = model(transformed_feature_tnsr)
             prediction_tnsr = self.untransform(transformed_prediction_tnsr)
         return prediction_tnsr
 
     def get_model_device(self) -> torch.device:
         """Get the device where the model is currently located."""
-        return next(self.model.parameters()).device
+        return next(cast(nn.Module, self.model).parameters()).device
     
     def is_model_on_mps(self) -> bool:
         """Check if the model is on MPS device."""
@@ -241,11 +250,11 @@ class ModelRunnerNN(ModelRunner):
             loss_tnsr: torch.Tensor = torch.tensor(np.inf)):
         """Serializes a model checkpoint."""
         checkpoint_dct = {
-            'model': self.model.state_dict(),
+            'model': cast(nn.Module, self.model).state_dict(),
             'num_epoch': self.num_epoch,
             'learning_rate': self.learning_rate,
             'is_normalized': self.is_normalized,
-            'dataloader': self.dataloader,
+            'train_dl': self.train_dl,
             'max_fractional_error': self.max_fractional_error,
             'criterion': self.criterion,
             'noise_std': self.noise_std,
@@ -254,7 +263,7 @@ class ModelRunnerNN(ModelRunner):
             'feature_std_tnsr': self.feature_std_tnsr.cpu(),
             'target_std_tnsr': self.target_std_tnsr.cpu(),
             'epoch': epoch,
-            'model_state_dict': self.model.state_dict(),
+            'model_state_dict': cast(nn.Module, self.model).state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
             'loss': loss_tnsr,
         }
@@ -272,7 +281,7 @@ class ModelRunnerNN(ModelRunner):
         noise_std = checkpoint_dct['noise_std']
         is_l1_regularization = checkpoint_dct['is_l1_regularization']
         is_accuracy_regularization = checkpoint_dct['is_accuracy_regularization']
-        dataloader = checkpoint_dct.get('dataloader', None)
+        train_dl = checkpoint_dct.get('train_dl', None)
         runner = cls(model=untrained_model, num_epoch=num_epoch, learning_rate=learning_rate,
                 is_normalized=is_normalized, max_fractional_error=max_fractional_error,
                 noise_std=noise_std, is_l1_regularization=is_l1_regularization,
@@ -283,5 +292,26 @@ class ModelRunnerNN(ModelRunner):
         target_std_tnsr = checkpoint_dct['target_std_tnsr'].detach().clone()
         runner.feature_std_tnsr = feature_std_tnsr.to(cn.DEVICE)
         runner.target_std_tnsr = target_std_tnsr.to(cn.DEVICE)
-        runner.dataloader = dataloader
+        if "dataloader" in checkpoint_dct.keys():
+            runner.train_dl = checkpoint_dct['dataloader']
+        else:
+            runner.train_dl = train_dl
         return runner
+
+    def isSameModel(self, other: nn.Module) -> bool:
+        """Check if two models have identical parameters"""
+        self_model = deepcopy(cast(nn.Module, self.model)).to(cn.CPU)
+        other_model = deepcopy(other).to(cn.CPU)
+        state_dict1 = self_model.state_dict()
+        state_dict2 = other_model.state_dict()
+        
+        # Check if they have the same keys
+        if set(state_dict1.keys()) != set(state_dict2.keys()):
+            return False
+        
+        # Check if parameter values are equal
+        for key in state_dict1.keys():
+            if not torch.equal(state_dict1[key], state_dict2[key]):
+                return False
+        
+        return True

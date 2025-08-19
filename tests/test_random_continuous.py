@@ -90,7 +90,7 @@ class TestRandomContinuous(unittest.TestCase):
             weight_arr=np.array([1.0]),
         )
         self.pcollection = PCollectionContinuous(cn.PC_MIXTURE_NAMES, dct)
-        self.random = RandomContinuous(pcollection=self.pcollection, total_num_sample=NUM_SAMPLE)
+        self.random = RandomContinuous(pcollection=self.pcollection, num_variate_sample=NUM_SAMPLE)
 
     def testConstructor(self):
         """Test the constructor of RandomContinuous."""

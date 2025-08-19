@@ -38,7 +38,7 @@ class RunnerResult(object):
 class ModelRunner(object):
     # Runner for Autoencoder
 
-    def __init__(self, model:nn.Module, criterion:nn.Module=nn.MSELoss(), is_report:bool=False):
+    def __init__(self, model:object, criterion:nn.Module=nn.MSELoss(), is_report:bool=False):
         """
         Args:
             model (nn.Module): The model to train.
@@ -48,7 +48,7 @@ class ModelRunner(object):
         self.model = model
         self.criterion = criterion
         self.is_report = is_report
-        self.dataloader: Union[None, DataLoader] = None
+        self.train_dl: Union[None, DataLoader] = None
         # Calculated state
         self.feature_std_tnsr = torch.tensor([np.nan])  # Calculated by subclass
         self.target_std_tnsr = torch.tensor([np.nan])   # Calculated by subclass
@@ -68,12 +68,12 @@ class ModelRunner(object):
         target_tnsr = loader.dataset.target_tnsr # type: ignore
         return feature_tnsr, target_tnsr
 
-    def fit(self, train_loader: DataLoader) -> RunnerResult:
+    def fit(self, train_dl: DataLoader) -> RunnerResult:
         """
         Train the model.
 
         Args:
-            train_loader (DataLoader): DataLoader for training data
+            train_dl (DataLoader): DataLoader for training data
         Returns:
             RunnerResult: losses and number of epochs
         """
@@ -123,7 +123,7 @@ class ModelRunner(object):
         test_runner_result = self.evaluate(test_loader)
         return train_runner_result, test_runner_result
     
-    def makeRelativeError(self, test_loader: DataLoader) -> pd.DataFrame:
+    def makeRelativeError(self, test_loader: DataLoader) -> Tuple[pd.DataFrame, pd.Series]:
         """Calculate the relative error of the model predictions.
 
         Args:
@@ -137,14 +137,21 @@ class ModelRunner(object):
         prediction_tnsr = self.predict(feature_tnsr)
         prediction_df = pd.DataFrame(prediction_tnsr.to(cn.CPU).numpy(), columns=columns)
         target_df = pd.DataFrame(target_tnsr.to(cn.CPU).numpy(), columns=columns)
-        result_df = (prediction_df - target_df)/target_df
-        return result_df
+        error_df = (prediction_df - target_df)/target_df
+        # Series for maximum relative error per sample
+        arr = error_df.values
+        max_arr = arr.max(axis=1)
+        min_arr = arr.min(axis=1)
+        is_max_arr = max_arr > np.abs(min_arr)
+        value_arr = min_arr
+        value_arr[is_max_arr] = max_arr[is_max_arr]
+        return error_df, pd.Series(value_arr)
     
     def plotEvaluate(self, test_loader: DataLoader, ax=None, is_plot: bool = True):
         """Plot the evaluation results.
             ax (Optional[plt.Axes]): Matplotlib axes to plot on.
         """
-        plot_df = self.makeRelativeError(test_loader)
+        plot_df, _ = self.makeRelativeError(test_loader)
         columns = list(plot_df.columns)
         plot_df['class'] = "relative error"
         # Plot
@@ -186,60 +193,24 @@ class ModelRunner(object):
         if is_plot:
             plt.show()
 
-    def indexQuadraticColumns(self, tnsr: torch.Tensor) -> List[int]:
+    def indexQuadraticColumns(self) -> List[int]:
         """Returns the indices of the quadratic columns in a tensor."""
-        if self.dataloader is None:
-            import pdb; pdb.set_trace()  # type: ignore
-        df = self.dataloader.dataset.data_df  # type: ignore
+        df = self.train_dl.dataset.data_df  # type: ignore
         indices = [list(df.columns).index(c) for c in df.columns if c.count("_") == 3]
         return indices
     
     def transform(self, tensor: torch.Tensor) -> torch.Tensor:
         """Transforms the tensor before prediction."""
         normalized_tnsr = tensor / self.feature_std_tnsr
-        indices = self.indexQuadraticColumns(normalized_tnsr)
+        indices = self.indexQuadraticColumns()
         new_tnsr = normalized_tnsr.clone()
         new_tnsr[:, indices] = torch.sqrt(normalized_tnsr[:, indices])
         return new_tnsr
 
     def untransform(self, tensor: torch.Tensor) -> torch.Tensor:
         """Inverts transform after prediction."""
-        indices = self.indexQuadraticColumns(tensor)
+        indices = self.indexQuadraticColumns()
         new_tnsr = tensor.clone()
         new_tnsr[:, indices] = tensor[:, indices]*tensor[:, indices]
         denormalized_tensor = new_tnsr * self.feature_std_tnsr
         return denormalized_tensor
-    
-    def isSameModel(self, other: nn.Module) -> bool:
-        """Check if two models have identical parameters"""
-        self_model = deepcopy(self.model).to(cn.CPU)
-        other_model = deepcopy(other).to(cn.CPU)
-        state_dict1 = self_model.state_dict()
-        state_dict2 = other_model.state_dict()
-        
-        # Check if they have the same keys
-        if set(state_dict1.keys()) != set(state_dict2.keys()):
-            return False
-        
-        # Check if parameter values are equal
-        for key in state_dict1.keys():
-            if not torch.equal(state_dict1[key], state_dict2[key]):
-                return False
-        
-        return True
-    
-    #################################################
-    
-    def deprecated_unitize(self, tensor: torch.Tensor) -> torch.Tensor:
-        """Takes the square root of quadratic columns of a tensor."""
-        indices = self.indexQuadraticColumns(tensor)
-        new_tnsr = tensor.clone()
-        new_tnsr[:, indices] = torch.sqrt(tensor[:, indices])
-        return new_tnsr
-    
-    def deprecated_deunitize(self, tensor: torch.Tensor) -> torch.Tensor:
-        """Squares quadratic columns of a tensor."""
-        indices = self.indexQuadraticColumns(tensor)
-        new_tnsr = tensor.clone()
-        new_tnsr[:, indices] = tensor[:, indices]*tensor[:, indices]
-        return new_tnsr
