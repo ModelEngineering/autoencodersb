@@ -12,10 +12,10 @@ from torch.utils.data import DataLoader
 import pandas as pd    # type: ignore
 import unittest
 
-IGNORE_TESTS = True
-IS_PLOT = True
+IGNORE_TESTS = False
+IS_PLOT = False
 NUM_EPOCH = 2000
-NUM_EPOCH = 20000
+NUM_EPOCH = 1000
 TARGET_COLUMN = "target"  # Assuming the target column is named 'target'
 NUM_DEPENDENT_FEATURE = 6
 NUM_OUTPUT_FEATURE = 2
@@ -74,8 +74,8 @@ class TestModelRunner(unittest.TestCase):
         self.runner.plotEvaluate(TEST_DL, is_plot=IS_PLOT)
 
     def testSerializeDeserialize(self):
-        #if IGNORE_TESTS:
-        #    return
+        if IGNORE_TESTS:
+            return
         runner = ModelRunnerNN(model=MODEL, num_epoch=NUM_EPOCH,
                 learning_rate=1e-5, is_normalized=True,
                 max_fractional_error=0.1)

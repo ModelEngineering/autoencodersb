@@ -123,24 +123,37 @@ class ModelRunner(object):
         test_runner_result = self.evaluate(test_loader)
         return train_runner_result, test_runner_result
     
-    def plotEvaluate(self, test_loader: DataLoader, ax=None, is_plot: bool = True):
-        """Plot the evaluation results.
-            ax (Optional[plt.Axes]): Matplotlib axes to plot on.
+    def makeRelativeError(self, test_loader: DataLoader) -> pd.DataFrame:
+        """Calculate the relative error of the model predictions.
+
+        Args:
+            test_loader (DataLoader): DataLoader for the test data.
+
+        Returns:
+            pd.DataFrame: DataFrame containing the relative errors.
         """
         columns = test_loader.dataset.data_df.columns # type: ignore
         feature_tnsr, target_tnsr = self.getFeatureTarget(test_loader)
         prediction_tnsr = self.predict(feature_tnsr)
         prediction_df = pd.DataFrame(prediction_tnsr.to(cn.CPU).numpy(), columns=columns)
         target_df = pd.DataFrame(target_tnsr.to(cn.CPU).numpy(), columns=columns)
-        plot_df = (prediction_df - target_df).abs()/target_df
+        result_df = (prediction_df - target_df)/target_df
+        return result_df
+    
+    def plotEvaluate(self, test_loader: DataLoader, ax=None, is_plot: bool = True):
+        """Plot the evaluation results.
+            ax (Optional[plt.Axes]): Matplotlib axes to plot on.
+        """
+        plot_df = self.makeRelativeError(test_loader)
+        columns = list(plot_df.columns)
         plot_df['class'] = "relative error"
         # Plot
         if ax is None:
             _, ax = plt.subplots(figsize=(10, 6))
         parallel_coordinates(plot_df, "class", ax=ax, alpha=0.7,
                 color=['blue', 'orange'], linewidth=0.3)
-        ax.plot([0, len(columns)-1], [0, 0], '--', color='red')
-        ax.set_title(f"{len(prediction_df)} Relative Prediction Errors")
+        ax.plot([0, len(columns)], [0, 0], '--', color='red')
+        ax.set_title(f"{len(plot_df)} Relative Prediction Errors")
         ax.set_xlabel("features")
         ax.set_ylabel("fractional Error relative to true target")
         plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
@@ -172,14 +185,6 @@ class ModelRunner(object):
         plt.tight_layout()
         if is_plot:
             plt.show()
-
-    """ def serialize(self, path: str):
-        raise NotImplementedError("Subclasses must implement this method.")
-    
-    @classmethod
-    def deserialize(cls, untrained_model: nn.Module, path: str) -> 'ModelRunner':
-        # Deserializes the model from a file.
-        raise NotImplementedError("Subclasses must implement this method.") """
 
     def indexQuadraticColumns(self, tnsr: torch.Tensor) -> List[int]:
         """Returns the indices of the quadratic columns in a tensor."""

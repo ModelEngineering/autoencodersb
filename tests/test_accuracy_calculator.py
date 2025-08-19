@@ -60,10 +60,12 @@ class TestAccuracyCalculator(unittest.TestCase):
     def testPlotCDFComparison(self):
         if IGNORE_TESTS:
             return
-        error_arr = np.random.normal(0, 1, 1000)  # Simulated fractional errors
-        other_calculator = AccuracyCalculator(error_arr)
-        self.calculator.plotCDFComparison(other_calculator,
-                names=['uniform', 'normal'], is_plot=IS_PLOT)
+        calculators = [self.calculator]
+        for _ in range(4):
+            error_arr = np.random.normal(0, 1, 1000)  # Simulated fractional errors
+            other_calculator = AccuracyCalculator(error_arr)
+            calculators.append(other_calculator)
+        self.calculator.plotCDFComparison(calculators, is_plot=IS_PLOT)
 
 
 if __name__ == '__main__':

@@ -92,14 +92,15 @@ class AccuracyCalculator(object):
         if is_plot:
             plt.show()
 
-    def plotCDFComparison(self, calculator: 'AccuracyCalculator',
+    @classmethod
+    def plotCDFComparison(cls, calculators: List['AccuracyCalculator'],
             names: Optional[List[str]] = None,
             ax: Optional[Axes] = None, is_plot: bool=True) -> None:
         """
         Plot the CDF of the errors from this calculator and another calculator.
-        
+
         Args:
-            calculator (AccuracyCalculator): Another AccuracyCalculator instance.
+            calculators (List[AccuracyCalculator]): List of AccuracyCalculator instances.
             names (Optional[List[str]]): List of names for the plots.
             ax (plt.Axes, optional): Matplotlib axes object. If None, creates a new figure.
             is_plot (bool, optional): Whether to plot the CDF. Defaults to True.
@@ -108,15 +109,13 @@ class AccuracyCalculator(object):
             plt.figure(figsize=(10, 6))
             ax = plt.gca()
         if names is None:
-            names = ['Current', 'Other']
-        # Create data
-        cdf_df = self.calculateCDF().cdf_df
-        other_cdf_df = calculator.calculateCDF().cdf_df
-        # Plot
-        ax.plot(cdf_df[COL_ERROR], cdf_df[COL_CDF], marker='o',
-                label=names[0])
-        ax.plot(other_cdf_df[COL_ERROR], other_cdf_df[COL_CDF], marker='x',
-                label=names[1])
+            names = [str(n) for n in range(len(calculators))]
+        # Do plots
+        for idx, calculator in enumerate(calculators):
+            cdf_df = calculator.calculateCDF().cdf_df
+            ax.plot(cdf_df[COL_ERROR], cdf_df[COL_CDF], marker='o',
+                    linewidth=1, markersize=1,
+                    label=names[idx])
         ax.set_title('Cumulative Distribution Function (CDF) Comparison')
         ax.set_xlabel('Error')
         ax.set_ylabel('CDF')
