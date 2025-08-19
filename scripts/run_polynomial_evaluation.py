@@ -6,12 +6,12 @@ from iplane.accuracy_calculator import AccuracyCalculator  # type: ignore
 import os
 import numpy as np  # type: ignore
 
-NUM_EPOCH = 20000
+NUM_EPOCH = 2000
 TARGET_COLUMN = "target"  # Assuming the target column is named 'target'
 NUM_DEPENDENT_FEATURE = 6
 NUM_OUTPUT_FEATURE = 2
 NUM_INPUT_FEATURE = NUM_DEPENDENT_FEATURE + NUM_OUTPUT_FEATURE
-NUM_SAMPLE = 1000
+NUM_SAMPLE = 10000
 
 def makeModel():
     """Creates a model for testing."""
@@ -20,7 +20,7 @@ def makeModel():
 
 TRAIN_DL, dct = makeAutocoderData(num_sample=NUM_SAMPLE, num_independent_feature=NUM_OUTPUT_FEATURE,
         num_dependent_feature=NUM_DEPENDENT_FEATURE, num_value=10)
-TEST_DL = makeAutocoderData(num_sample=1000, num_independent_feature=NUM_OUTPUT_FEATURE,
+TEST_DL = makeAutocoderData(num_sample=10000, num_independent_feature=NUM_OUTPUT_FEATURE,
                             num_dependent_feature=NUM_DEPENDENT_FEATURE, num_value=10,
                             multiplier_dct=dct)[0]
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -77,4 +77,5 @@ def compareModels(num_models: int = 10):
 if __name__ == "__main__":
     #train()
     #evaluate()
-    compareModels()
+    makeModels()
+    #compareModels()
