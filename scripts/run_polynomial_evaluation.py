@@ -111,18 +111,29 @@ def compareModels(num_model: int = 10, num_sample: int = 1000):
                         num_dependent_feature=NUM_DEPENDENT_FEATURE, num_value=10,
                         is_new_multiplier=False)
     calculators = []
+    max_err_arrs = []
     for idx in range(num_model):
         model = makeModel()
         runner = ModelRunnerNN.deserialize(model, MULTI_SERIALIZE_PATH % idx)
         _, max_err_ser = runner.makeRelativeError(test_dl)
+        max_err_arrs.append(np.reshape(max_err_ser.values, (-1, 1)))
         calculator = AccuracyCalculator(cast(np.ndarray, max_err_ser.values))
         calculators.append(calculator)
     # Plot the CDF of the errors from all calculators
     AccuracyCalculator.plotCDFComparison(calculators, is_plot=True)
+    # Plot the "oracle" ensemble
+    max_err_arr = np.hstack(max_err_arrs)
+    abs_oracle_err_arr = np.min(np.abs(max_err_arr), axis=1)
+    nonabs_oracle_err_arr = np.min(max_err_arr, axis=1)
+    pos_sel = abs_oracle_err_arr != nonabs_oracle_err_arr
+    oracle_err_arr = abs_oracle_err_arr.copy()
+    oracle_err_arr[pos_sel] *= -1
+    oracle_calculator = AccuracyCalculator(oracle_err_arr)
+    AccuracyCalculator.plotCDFComparison([oracle_calculator], is_plot=True)
 
 if __name__ == "__main__":
     #train(num_epoch=50)
     #evaluate()
     num_model = 10
-    makeModels(num_model=num_model, num_sample=1000, num_epoch=7000)
-    compareModels(num_model=num_model)
+    #makeModels(num_model=num_model, num_sample=1000, num_epoch=7000)
+    compareModels(num_model=7, num_sample=100000)
