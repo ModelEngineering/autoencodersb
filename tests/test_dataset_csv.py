@@ -1,11 +1,11 @@
-from iplane.dataset_csv import DatasetCSV # type: ignore
-import iplane.constants as cn  # type: ignore
+from autoencodersb.dataset_csv import DatasetCSV # type: ignore
+import autoencodersb.constants as cn  # type: ignore
 
 import pandas as pd    # type: ignore
 import unittest
 
 IGNORE_TESTS = False
-IS_PLOT = False
+IS_PLOT = False:while
 NUM_EPOCH = 3
 
 DATASET_CSV_PATH = "tests/test_dataset_csv.csv"
