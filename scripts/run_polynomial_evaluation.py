@@ -116,7 +116,7 @@ def compareModels(num_model: int = 10, num_sample: int = 1000):
         model = makeModel()
         runner = ModelRunnerNN.deserialize(model, MULTI_SERIALIZE_PATH % idx)
         _, max_err_ser = runner.makeRelativeError(test_dl)
-        max_err_arrs.append(np.reshape(max_err_ser.values, (-1, 1)))
+        max_err_arrs.append(np.reshape(cast(np.ndarray, max_err_ser.values), (-1, 1)))
         calculator = AccuracyCalculator(cast(np.ndarray, max_err_ser.values))
         calculators.append(calculator)
     # Plot the CDF of the errors from all calculators
@@ -136,4 +136,4 @@ if __name__ == "__main__":
     #evaluate()
     num_model = 10
     #makeModels(num_model=num_model, num_sample=1000, num_epoch=7000)
-    compareModels(num_model=7, num_sample=100000)
+    compareModels(num_model=2, num_sample=100000)
