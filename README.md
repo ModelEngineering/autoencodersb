@@ -1,6 +1,5 @@
-# Information Plane Analysis
+# AUTOENCODERS FOR SYSTEMS BIOLOGY
 
-[![Continous integration](https://github.com/ModelEngineering/iplane/actions/workflows/github-actions.yml/badge.svg)](https://github.com/ModelEngineering/iplane/actions/workflows/github-actions.yml)
+[![Continous integration](https://github.com/ModelEngineering/iplane/actions/workflows/github-actions.yml/badge.svg)](https://github.com/ModelEngineering/autoencodersb/actions/workflows/github-actions.yml)
 
-Much of the repo is about estimating mutual information from a sample.
-Small delta.
+Construction of Autoencoder for interpreting and reducing the dimensions of reactions networks in systems biology.

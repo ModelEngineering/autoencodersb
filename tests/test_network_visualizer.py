@@ -1,5 +1,5 @@
-from iplane.network_visualizer import ActivationExtractor
-import iplane.constants as cn  # type: ignore
+from autoencodersb.network_visualizer import ActivationExtractor
+import autoencodersb.constants as cn  # type: ignore
 
 import torch 
 import unittest

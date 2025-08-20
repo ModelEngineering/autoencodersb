@@ -1,8 +1,8 @@
 '''Utilities for testing the iPlane code.'''
 
-from iplane.dataset_csv import DatasetCSV # type: ignore
-from iplane.autoencoder import Autoencoder  # type: ignore
-import iplane.constants as cn  # type: ignore
+from autoencodersb.dataset_csv import DatasetCSV # type: ignore
+from autoencodersb.autoencoder import Autoencoder  # type: ignore
+import autoencodersb.constants as cn  # type: ignore
 
 import itertools
 import numpy as np  # type: ignore

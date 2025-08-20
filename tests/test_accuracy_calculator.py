@@ -1,4 +1,4 @@
-from iplane.accuracy_calculator import AccuracyCalculator, AccuracyResult, PERCENTILE_STATISTICS  # type: ignore
+from autoencodersb.accuracy_calculator import AccuracyCalculator, AccuracyResult, PERCENTILE_STATISTICS  # type: ignore
 
 import numpy as np  # type: ignore
 import pandas as pd    # type: ignore

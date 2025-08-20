@@ -1,6 +1,6 @@
 '''This module trains, runs a visualizes a fully connected autoencoder on the MNIST dataset.'''
 
-import iplane.constants as cn
+import autoencodersb.constants as cn
 
 import torch
 import torch.nn as nn

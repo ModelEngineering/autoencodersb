@@ -1,6 +1,6 @@
-from iplane.model_runner_pca import ModelRunnerPCA, RunnerResult  # type: ignore
-import iplane.constants as cn  # type: ignore
-from iplane.dataset_csv import DatasetCSV  # type: ignore
+from autoencodersb.model_runner_pca import ModelRunnerPCA, RunnerResult  # type: ignore
+import autoencodersb.constants as cn  # type: ignore
+from autoencodersb.dataset_csv import DatasetCSV  # type: ignore
 from tests.utils_test import makeAutocoderData  # type: ignore
 
 import numpy as np  # type: ignore

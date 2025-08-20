@@ -1,7 +1,7 @@
 '''Extracts activations from a pytorch model.'''
 # author: Claude
 
-import iplane.constants as cn # type: ignore
+import autoencodersb.constants as cn # type: ignore
 
 import torch
 import torch.nn as nn

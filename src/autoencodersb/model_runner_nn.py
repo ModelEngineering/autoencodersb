@@ -1,7 +1,7 @@
 '''Running a model for a neural network.'''
 
-import iplane.constants as cn  # type: ignore
-from iplane.model_runner import ModelRunner, RunnerResult  # type: ignore
+import autoencodersb.constants as cn  # type: ignore
+from autoencodersb.model_runner import ModelRunner, RunnerResult  # type: ignore
 
 from copy import deepcopy
 import numpy as np

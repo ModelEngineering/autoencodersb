@@ -1,5 +1,5 @@
-from iplane.autoencoder import Autoencoder, AutoencoderRunner  # type: ignore
-import iplane.constants as cn  # type: ignore
+from autoencodersb.autoencoder import Autoencoder, AutoencoderRunner  # type: ignore
+import autoencodersb.constants as cn  # type: ignore
 
 import torch 
 from torch import nn

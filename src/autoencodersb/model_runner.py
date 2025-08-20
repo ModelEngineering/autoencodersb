@@ -1,6 +1,6 @@
 '''Abstract class for running a model. '''
 
-from iplane import constants as cn
+from autoencodersb import constants as cn
 
 from collections import namedtuple
 from copy import deepcopy

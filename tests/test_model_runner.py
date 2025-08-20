@@ -1,6 +1,6 @@
-from iplane.model_runner_nn import ModelRunnerNN, RunnerResultPredict  # type: ignore
-from iplane.model_runner import RunnerResult  # type: ignore
-from iplane.autoencoder import Autoencoder  # type: ignore
+from autoencodersb.model_runner_nn import ModelRunnerNN, RunnerResultPredict  # type: ignore
+from autoencodersb.model_runner import RunnerResult  # type: ignore
+from autoencodersb.autoencoder import Autoencoder  # type: ignore
 from tests.utils_test import makeAutocoderData  # type: ignore
 
 from copy import deepcopy

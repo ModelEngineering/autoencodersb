@@ -1,4 +1,4 @@
-from iplane.model_runner import ModelRunner, RunnerResult # type: ignore
+from autoencodersb.model_runner import ModelRunner, RunnerResult # type: ignore
 
 import joblib # type: ignore
 import numpy as np

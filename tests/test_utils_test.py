@@ -1,5 +1,5 @@
 from tests import utils_test as util
-import iplane.constants as cn  # type: ignore
+import autoencodersb.constants as cn  # type: ignore
 
 import matplotlib.pyplot as plt
 import pandas as pd  # type: ignore
