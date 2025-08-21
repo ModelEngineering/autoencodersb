@@ -5,7 +5,7 @@ import pandas as pd    # type: ignore
 import unittest
 
 IGNORE_TESTS = False
-IS_PLOT = False:while
+IS_PLOT = False
 NUM_EPOCH = 3
 
 DATASET_CSV_PATH = "tests/test_dataset_csv.csv"
