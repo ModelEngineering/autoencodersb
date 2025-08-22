@@ -13,9 +13,16 @@ class Polynomial(object):
 
     def __repr__(self):
         strs = [str(t) for t in self.terms]
-        return " + ".join(strs)
+        return "  +  ".join(strs)
     
-    def evaluate(self, independent_variable_arr: np.ndarray) -> np.ndarray:
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, Polynomial):
+            return False
+        if len(self.terms) != len(other.terms):
+            return False
+        return all([t1 == t2 for t1, t2 in zip(self.terms, other.terms)])
+
+    def generate(self, independent_variable_arr: np.ndarray) -> np.ndarray:
         """Evaluate the polynomial term.
 
         Args:
@@ -25,4 +32,4 @@ class Polynomial(object):
             np.ndarray: Result of the evaluation
         """
         # Evaluate the term by multiplying the coefficient with the independent variables raised to the appropriate powers
-        return np.sum([term.generate(independent_variable_arr) for term in self.terms], axis=0)
+        return np.sum([term.generate(independent_variable_arr) for term in self.terms], axis=0).reshape(-1).astype(np.float32)
