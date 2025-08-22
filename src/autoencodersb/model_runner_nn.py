@@ -118,6 +118,7 @@ class ModelRunnerNN(ModelRunner):
         smoothed_inaccuracy = np.mean(mae_arr)
         return smoothed_inaccuracy
 
+    # FIXME: Don't do random permutations for paths. Pick random start points sufficient for a given sequence length
     def fit(self, train_dl: Optional[DataLoader]=None, num_epoch: Optional[int]=None) -> RunnerResultPredict:
         """
         Train the model. All calculations are on the accelerator device.
