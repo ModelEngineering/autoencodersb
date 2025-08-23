@@ -53,8 +53,7 @@ class DataGenerator(object):
         arr = self.polynomial_collection.generate(independent_arr)
         noise = np.random.normal(0, self.noise_std, arr.shape)
         new_arr = arr + noise
-        columns = [str(t) for t in self.polynomial_collection.terms]
-        df = pd.DataFrame(new_arr, columns=columns)
+        df = pd.DataFrame(new_arr, columns=self.polynomial_collection.term_strs)
         # Construct the DataLoader
         batch_size = int(np.ceil(BATCH_SIZE_FRACTION*self.num_sample))
         dataloader = DataLoader(DatasetCSV(csv_input=df, target_column=None),
