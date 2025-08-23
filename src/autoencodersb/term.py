@@ -15,7 +15,7 @@ class Term(object):
         """
         self.coefficient = coefficient
         self.exponent_dct = dict(exponent_dct)
-        self.num_variable = len([e for e in exponent_dct if e != 0])
+        self.variables = [k for k, v in exponent_dct.items() if not np.isclose(v, 0)]
 
     def __repr__(self):
         term_strs = [f"X_{n}^{p}" if not np.isclose(p, 1) else f"X_{n}"

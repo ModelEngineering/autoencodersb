@@ -10,6 +10,9 @@ class Polynomial(object):
 
     def __init__(self, terms: List[Term]):
         self.terms = terms
+        self.variables: list = []
+        _ = [self.variables.extend(t.variables) for t in self.terms] # type: ignore
+        self.variables = list(set(self.variables))
 
     def __repr__(self):
         strs = [str(t) for t in self.terms]
@@ -31,5 +34,5 @@ class Polynomial(object):
         Returns:
             np.ndarray: Result of the evaluation
         """
-        # Evaluate the term by multiplying the coefficient with the independent variables raised to the appropriate powers
+        # Evaluate each term
         return np.sum([term.generate(independent_variable_arr) for term in self.terms], axis=0).reshape(-1).astype(np.float32)

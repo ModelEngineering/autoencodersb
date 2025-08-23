@@ -11,16 +11,18 @@ import unittest
 IGNORE_TESTS = False
 IS_PLOT = False
 COEFFICIENT1 = 3
-EXPONENT1_DCT = {n: float(n) for n in range(3)}
+EXPONENT1_DCT = {n: float(n + 1) for n in range(3)}
 COEFFICIENT2 =2.5 
-EXPONENT2_DCT = {n: float(n) for n in range(7)}
+NUM_VARIABLE2 = 2
+NUM_VARIABLE = 3  # X0, X1, X2
+EXPONENT2_DCT = {n: float(n + 1) for n in range(NUM_VARIABLE2)}
 TERM1 = Term(COEFFICIENT1, EXPONENT1_DCT)
 TERM2 = Term(COEFFICIENT2, EXPONENT2_DCT)
 TERMS = [TERM1, TERM2]
 
 
 ########################################
-class TestTerm(unittest.TestCase):
+class TestPolynomial(unittest.TestCase):
 
     def setUp(self):
         self.polynomial = Polynomial(TERMS)
@@ -30,6 +32,7 @@ class TestTerm(unittest.TestCase):
             return
         self.assertEqual(len(self.polynomial.terms),  len(TERMS))
         self.assertEqual(self.polynomial.terms, TERMS)
+        self.assertEqual(len(self.polynomial.variables), NUM_VARIABLE)
 
     def testStr(self):
         if IGNORE_TESTS:
@@ -43,9 +46,9 @@ class TestTerm(unittest.TestCase):
         term = Term.make(k=1, e1=1, e3=2)
         terms = [TERM1, term]
         polynomial = Polynomial(terms)
-        independent_variable_arr = np.array([[0, 1, 2, 3], [0, 4, 5, 6]], dtype=np.float32)
+        independent_variable_arr = np.array([[1, 1, 2, 3], [1, 4, 5, 6]], dtype=np.float32)
         result = polynomial.generate(independent_variable_arr)
-        self.assertTrue(np.all(result == np.array([21, 444])))
+        self.assertTrue(np.all(result == np.array([33, 6144])))
 
     def testSum(self):
         if IGNORE_TESTS:

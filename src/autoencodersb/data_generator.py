@@ -77,7 +77,7 @@ class DataGenerator(object):
                 I is self.num_independent_feature
         """
         def generate(num_sample) -> np.ndarray:
-            shape = (num_sample, self.polynomial_collection.num_independent_variable)
+            shape = (num_sample, self.polynomial_collection.num_variable)
             result_arr = np.random.uniform(min_value, max_value, shape)
             final_arr = np.round(result_arr, precision)
             return final_arr

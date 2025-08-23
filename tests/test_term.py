@@ -10,7 +10,8 @@ import unittest
 IGNORE_TESTS = False
 IS_PLOT = False
 COEFFICIENT = 3
-EXPONENT_DCT = {n: float(n) for n in range(3)}
+NUM_VARIABLE = 3
+EXPONENT_DCT = {n: float(n+1) for n in range(NUM_VARIABLE)}
 
 
 ########################################
@@ -24,11 +25,12 @@ class TestTerm(unittest.TestCase):
             return
         self.assertEqual(self.term.coefficient, COEFFICIENT)
         self.assertEqual(self.term.exponent_dct, EXPONENT_DCT)
+        self.assertEqual(len(self.term.variables), NUM_VARIABLE)
 
     def testStr(self):
         if IGNORE_TESTS:
             return
-        self.assertEqual(str(self.term), '3 * X_1 * X_2^2.0')
+        self.assertEqual(str(self.term), '3 * X_0 * X_1^2.0 * X_2^3.0')
 
     def testStrScale(self):
         if IGNORE_TESTS:

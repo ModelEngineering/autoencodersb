@@ -1,6 +1,6 @@
 '''Represents a product of independent variables raised to an exponent.'''
 
-from autoencodersb.term import Term  # type: ignore
+from autoencodersb.polynomial import Polynomial# type: ignore
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -9,12 +9,12 @@ from typing import List
 
 class PolynomialRatio(object):
 
-    def __init__(self, numerator: Term, denominator: Term):
+    def __init__(self, numerator: Polynomial, denominator: Polynomial):
         self.numerator = numerator
         self.denominator = denominator
-        self.exponent_dct = dict(numerator.exponent_dct)
-        self.exponent_dct.update(denominator.exponent_dct)
-        self.num_variable = len(self.exponent_dct.keys())
+        self.variables = list(self.numerator.variables)
+        self.variables.extend(self.denominator.variables)
+        self.variables = list(set(self.variables))
 
     def __repr__(self):
         return f"({str(self.numerator)}) / ({str(self.denominator)})"
