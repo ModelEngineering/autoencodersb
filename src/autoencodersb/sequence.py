@@ -13,6 +13,7 @@ class Sequence(object):
             num_sample: int = 100,
             initial_value: float = 0.0,
             time_increment: float = 1.0,
+            density: float = 1.0,
             seq_type: str = cn.SEQ_LINEAR):
         """
         Args:
@@ -20,7 +21,8 @@ class Sequence(object):
             num_sample (int): Number of steps in the sequence.
             initial_value (float): Initial time value used in the sequence calculation
             time_increment (float): Time increment between steps.
-            type (str): Type of sequence (linear, exponential, integral_exponential).
+            density (float): Density of the data points in the sequence. Number points per unit.
+            seq_type (str): Type of sequence (linear, exponential, integral_exponential).
                 linear: U[initial_value, num_step* time_increment]
                 exponential: exp**-r*linear
                 integral_exponential: 1 - exp**-r*linear
@@ -29,6 +31,7 @@ class Sequence(object):
         self.num_sample = num_sample
         self.initial_value = initial_value
         self.time_increment = time_increment
+        self.density = density
         self.seq_type = seq_type
         if not seq_type in cn.SEQ_TYPES:
             raise ValueError(f"Unknown sequence type: {self.seq_type}")
@@ -51,7 +54,7 @@ class Sequence(object):
         else:
             raise ValueError(f"Unknown sequence type: {self.seq_type}")
         #
-        return result_arr.reshape(-1, 1)
+        return result_arr.reshape(-1, 1)/self.density
 
     def plot(self, ax=None, is_plot: bool = True) -> None:
         """

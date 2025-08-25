@@ -90,35 +90,40 @@ class DataGenerator(object):
             return pd.DataFrame(final_arr, columns=columns)
         self.variable_func = generate
 
-    def specifySequences(self, sequences: Optional[List[Sequence]] = None) -> None:
+    def specifySequences(self, sequences: Optional[List[Sequence]] = None, **kwargs) -> None:
         """Generates sequenceof features
 
         Args:
             sequences (List[Sequence]): List of Sequence objects defining each independent variable.
+            kwargs: Options for sequence constructor
 
         Returns: List[Sequence]
         """
-        if sequences is None:
-            num_variable = self.polynomial_collection.num_variable
-            seq_types = np.array(cn.SEQ_TYPES)[np.random.randint(0, len(cn.SEQ_TYPES), num_variable)]
-            sequences = [Sequence(num_sample=self.num_sample, seq_type=seq_types[n])
-                    for n in range(num_variable)]
         #
         def generate(num_sample: int) -> pd.DataFrame:
             # Generate a sequence of values
-            arr = np.hstack([s.generate() for s in sequences]).reshape(num_sample, len(sequences))
+            if sequences is None:
+                new_sequences = [Sequence(num_sample=num_sample, **kwargs)]*self.polynomial_collection.num_variable
+            else:
+                new_sequences = sequences
+            arr = np.hstack([s.generate() for s in new_sequences]).reshape(num_sample, len(new_sequences))
             columns = [f"X_{n}" for n in range(self.polynomial_collection.num_variable)]
-            return pd.DataFrame(arr, columns=columns)
+            df = pd.DataFrame(arr, columns=columns)
+            return df
         #
         self.variable_func = generate
 
-    def plotGeneratedData(self, is_plot: bool = True) -> None:
+    def plotGeneratedData(self, is_plot: bool = True, x_column: Optional[str] = None) -> None:
         """
         Plots the generated sequences using matplotlib.
+
+        Args:
+            is_plot (bool): Whether to display the plot.
+            x_column (Optional[str]): The name of the column to use as the x-axis. Defaults to observation index
         """
         if is_plot:
             _, ax = plt.subplots()
-            self.data_df.plot(ax=ax)
+            self.data_df.plot(ax=ax, x=x_column)
             ax.set_xlabel("time")
             ax.set_title("Generated Sequences")
             ax.grid()
