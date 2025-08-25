@@ -34,5 +34,12 @@ DC_CONTINUOUS_NAMES = [DC_ENTROPY, DC_VARIATE_ARR, DC_DENSITY_ARR, DC_DX_ARR]
 DC_MIXTURE_NAMES = list(DC_CONTINUOUS_NAMES)
 DC_EMPIRICAL_NAMES = list(DC_MIXTURE_NAMES)
 
+# Type of sequences
+SEQ_LINEAR = "linear"
+SEQ_EXPONENTIAL = "exponential"
+SEQ_INTEGRAL_EXPONENTIAL = "integral_exponential"
+SEQ_TYPES = [SEQ_LINEAR, SEQ_EXPONENTIAL, SEQ_INTEGRAL_EXPONENTIAL]
+
+
 ######## CLASSES ########
 CDF = namedtuple('CDF', ['variate_arr', 'cdf_arr', 'variate_min', 'variate_max'])

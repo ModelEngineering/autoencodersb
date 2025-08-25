@@ -46,9 +46,9 @@ class TestPolynomial(unittest.TestCase):
         term = Term.make(k=1, e1=1, e3=2)
         terms = [TERM1, term]
         polynomial = Polynomial(terms)
-        independent_variable_arr = np.array([[1, 1, 2, 3], [1, 4, 5, 6]], dtype=np.float32)
-        result = polynomial.generate(independent_variable_arr)
-        self.assertTrue(np.all(result == np.array([33, 6144])))
+        variable_arr = np.array([[1, 1, 2, 3], [1, 4, 5, 6]], dtype=np.float32)
+        result_arr = polynomial.generate(variable_arr)
+        self.assertTrue(np.all(result_arr == np.array([33, 6144])))
 
     def testSum(self):
         if IGNORE_TESTS:

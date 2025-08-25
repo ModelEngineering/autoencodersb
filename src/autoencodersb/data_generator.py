@@ -1,13 +1,16 @@
 '''Generates synthetic data for training and testing autoencoders.'''
 
+from autoencodersb import constants as cn  # type: ignore
 from autoencodersb.dataset_csv import DatasetCSV
 from autoencodersb.polynomial_collection import PolynomialCollection  # type: ignore
 from autoencodersb.dataset_csv import DatasetCSV # type: ignore
+from autoencodersb.sequence import Sequence# type: ignore
 
+import matplotlib.pyplot as plt
 import numpy as np  # type: ignore
 from torch.utils.data import DataLoader
 import pandas as pd    # type: ignore
-from typing import Optional, Callable
+from typing import List, Callable, Optional
 
 
 BATCH_SIZE_FRACTION = 0.1  # Fraction of the number of samples to use as batch size
@@ -44,21 +47,25 @@ class DataGenerator(object):
         self.num_sample = num_sample
         self.noise_std = noise_std
         self.is_shuffle = is_shuffle
-        self.independent_feature_func: Callable[[int], np.ndarray] = lambda x: np.array(range(x))
+        self.variable_func: Callable[[int], pd.DataFrame] = lambda x: pd.DataFrame(np.array([]))
+        # Calculated
+        self.data_df = pd.DataFrame()  # Updated by generate
+        self.data_dl = DataLoader(DatasetCSV(csv_input=self.data_df, target_column=None),
+                shuffle=self.is_shuffle, batch_size=10)
 
     def generate(self) -> DataLoader:
         """Generates the full synthetic dataset."""
-        independent_arr = self.independent_feature_func(self.num_sample)
-        # Make a Dataframe
-        arr = self.polynomial_collection.generate(independent_arr)
-        noise = np.random.normal(0, self.noise_std, arr.shape)
-        new_arr = arr + noise
-        df = pd.DataFrame(new_arr, columns=self.polynomial_collection.term_strs)
+        independent_df = self.variable_func(self.num_sample)
+        # Make the DataFrame
+        dependent_df = self.polynomial_collection.generate(independent_df.values)
+        noise = np.random.normal(0, self.noise_std, dependent_df.shape)
+        dependent_df += noise
+        self.data_df = pd.concat([independent_df, dependent_df], axis=1)
         # Construct the DataLoader
         batch_size = int(np.ceil(BATCH_SIZE_FRACTION*self.num_sample))
-        dataloader = DataLoader(DatasetCSV(csv_input=df, target_column=None),
+        self.data_dl = DataLoader(DatasetCSV(csv_input=self.data_df, target_column=None),
                 shuffle=self.is_shuffle, batch_size=batch_size)
-        return dataloader
+        return self.data_dl
 
     def specifyIID(self, min_value: float = 1.0, max_value: float = 10.0,
             precision: int = 0) -> None:
@@ -75,39 +82,59 @@ class DataGenerator(object):
                 N is self.num_sample
                 I is self.num_independent_feature
         """
-        def generate(num_sample) -> np.ndarray:
+        def generate(num_sample) -> pd.DataFrame:
             shape = (num_sample, self.polynomial_collection.num_variable)
             result_arr = np.random.uniform(min_value, max_value, shape)
             final_arr = np.round(result_arr, precision)
-            return final_arr
-        self.independent_feature_func = generate
+            columns = [f"X_{n}" for n in range(self.polynomial_collection.num_variable)]
+            return pd.DataFrame(final_arr, columns=columns)
+        self.variable_func = generate
 
-    def specifySequence(self, min_value: float = 1, max_value: float = 10.0,
-            precision: int = 0, rate: float = -1) -> None:
-        """Generates a sequence of features for time series data using a random walk of
-            size 10**self.data_density
+    def specifySequences(self, sequences: Optional[List[Sequence]] = None) -> None:
+        """Generates sequenceof features
 
         Args:
-            min_value (float): Minimum value for the uniform distribution.
-            max_value (float): Maximum value for the uniform distribution.
-            precision (int): Number of decimal places to round the generated values.
+            sequences (List[Sequence]): List of Sequence objects defining each independent variable.
 
-        Returns:
-            np.ndarray (N X 3):
-                X_0: [min_value, max_value]
-                X_1: e**-rate*[min_value, max_value]
-                X_2: 1 - e**-rate*[min_value, max_value]
+        Returns: List[Sequence]
         """
-        if rate < 0:
-            raise ValueError("Rate must be non-negative.")
+        if sequences is None:
+            num_variable = self.polynomial_collection.num_variable
+            seq_types = np.array(cn.SEQ_TYPES)[np.random.randint(0, len(cn.SEQ_TYPES), num_variable)]
+            sequences = [Sequence(num_sample=self.num_sample, seq_type=seq_types[n])
+                    for n in range(num_variable)]
         #
-        def generate(num_sample: int) -> np.ndarray:
+        def generate(num_sample: int) -> pd.DataFrame:
             # Generate a sequence of values
-            sequence_arr = np.round(np.linspace(min_value, max_value, num=num_sample), precision).reshape(-1, 1)
-            exponential_decrease_arr = np.exp(-rate*sequence_arr).reshape(-1, 1)
-            exponential_increase_arr = 1 - np.exp(-rate*sequence_arr).reshape(-1, 1)
-            #
-            result_arr = np.hstack([sequence_arr, exponential_decrease_arr, exponential_increase_arr])
-            return result_arr
+            arr = np.hstack([s.generate() for s in sequences]).reshape(num_sample, len(sequences))
+            columns = [f"X_{n}" for n in range(self.polynomial_collection.num_variable)]
+            return pd.DataFrame(arr, columns=columns)
         #
-        self.independent_feature_func = generate
+        self.variable_func = generate
+
+    def plotGeneratedData(self, is_plot: bool = True) -> None:
+        """
+        Plots the generated sequences using matplotlib.
+        """
+        if is_plot:
+            _, ax = plt.subplots()
+            self.data_df.plot(ax=ax)
+            ax.set_xlabel("time")
+            ax.set_title("Generated Sequences")
+            ax.grid()
+            plt.show()
+
+    def plotErrorDifference(self, other_df: pd.DataFrame, is_plot: bool = True) -> pd.DataFrame:
+        """
+        Plots the error difference between the generated data and another DataGenerator's data.
+            (other_df - self.data_df)/self.data_df
+        """
+        error_df = (other_df - self.data_df)/self.data_df
+        if is_plot:
+            _, ax = plt.subplots()
+            error_df.plot(ax=ax)
+            ax.set_xlabel("time")
+            ax.set_title("relative error")
+            ax.grid()
+            plt.show()
+        return error_df

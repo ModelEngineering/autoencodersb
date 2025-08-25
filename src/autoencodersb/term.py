@@ -1,8 +1,7 @@
 '''Represents a product of independent variables raised to an exponent.'''
 
 import numpy as np
-import pandas as pd  # type: ignore
-from typing import List, Optional, Dict
+from typing import Optional, Dict
 
 
 class Term(object):

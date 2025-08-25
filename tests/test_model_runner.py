@@ -62,5 +62,6 @@ class TestModelRunner(unittest.TestCase):
         trues = [s in v for s, v in zip(max_error_ser.values, error_df.values)]
         self.assertTrue(all(trues))
 
+
 if __name__ == '__main__':
     unittest.main()

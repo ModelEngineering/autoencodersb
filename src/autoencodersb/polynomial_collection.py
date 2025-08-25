@@ -5,6 +5,7 @@ from autoencodersb.polynomial_ratio import PolynomialRatio  # type: ignore
 from autoencodersb.polynomial import Polynomial  # type: ignore
 
 import numpy as np
+import pandas as pd # type: ignore
 from typing import List, Union
 
 """
@@ -19,7 +20,7 @@ A PolynomialCollection is a List of Polynomial, Term, and/or PolynomialRatio..
 
 class PolynomialCollection(object):
 
-    def __init__(self, terms: Union[List[Term], List[Polynomial], List[PolynomialRatio]], is_random_path: bool = False):
+    def __init__(self, terms: Union[List[Term], List[Polynomial], List[PolynomialRatio]]):
         """
         Args:
             terms (List[Union[Term, TermRatio]]): _description_
@@ -36,8 +37,42 @@ class PolynomialCollection(object):
     def __repr__(self):
         return ",  ".join([str(t) for t in self.terms])
     
-    def generate(self, variable_arr: np.ndarray) -> np.ndarray:
+    def generate(self, variable_arr: np.ndarray) -> pd.DataFrame:
         """Evaluate the polynomial at the given independent variable values."""
         arrs = [term.generate(variable_arr) for term in self.terms]
         result_arr = np.hstack(arrs)
-        return result_arr
+        return pd.DataFrame(result_arr, columns=self.term_strs)
+
+    @classmethod
+    def make(cls,
+            is_mm_term: bool=True,
+            is_first_order_term: bool = True,
+            is_second_order_term: bool = True,
+            is_third_order_term: bool = True,
+    ) -> 'PolynomialCollection':
+        """
+        Creates a PolynomialCollection from the specified parameters.
+
+        Args:
+            is_mm_term (bool, optional): Whether to include mixed monomials.
+            is_first_order_term (bool, optional): Whether to include first-order terms.
+            is_second_order_term (bool, optional): Whether to include second-order terms.
+            is_third_order_term (bool, optional): Whether to include third-order terms.
+
+        Returns:
+            PolynomialCollection: The constructed PolynomialCollection.
+        """
+        terms:list = []
+        if is_mm_term:
+            # k*X_0/(1 + k'X_0)
+            denominator = Polynomial([Term.make(k=1), Term.make(e0=1)])
+            numerator = Polynomial([Term.make(e0=1)])
+            polynomial_ratio = PolynomialRatio(numerator, denominator)
+            terms.append(polynomial_ratio)
+        if is_first_order_term:
+            terms.append(Term.make(e0=1))
+        if is_second_order_term:
+            terms.append(Term.make(e0=1, e1=1))
+        if is_third_order_term:
+            terms.append(Term.make(e0=1, e1=1, e2=1))
+        return cls(terms)

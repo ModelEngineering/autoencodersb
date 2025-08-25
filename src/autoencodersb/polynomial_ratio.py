@@ -30,4 +30,5 @@ class PolynomialRatio(object):
         """
         numerator_value = self.numerator.generate(independent_variable_arr)
         denominator_value = self.denominator.generate(independent_variable_arr)
-        return numerator_value / denominator_value
+        result = numerator_value / denominator_value
+        return result.reshape(-1, 1)
