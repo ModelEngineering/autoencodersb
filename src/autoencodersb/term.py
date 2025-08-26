@@ -29,19 +29,22 @@ class Term(object):
             result = f"{self.coefficient} * {product_str}"
         return result
     
-    def generate(self, independent_variable_arr: np.ndarray) -> np.ndarray:
+    def generate(self, variable_arr: np.ndarray) -> np.ndarray:
         """Evaluate the polynomial term.
 
         Args:
-            independent_variable_arr (np.ndarray): N X I array of independent variables
+            variable_arr (np.ndarray): N X I array of independent variables
 
         Returns:
             np.ndarray: Result of the evaluation
         """
+        # Error check
+        if variable_arr.ndim != 2:
+            raise ValueError("Input must be a 2D array")
         # Evaluate the term by multiplying the coefficient with the independent variables raised to the appropriate powers
-        exponent_arr = np.zeros(independent_variable_arr.shape[1])
+        exponent_arr = np.zeros(variable_arr.shape[1])
         [exponent_arr.__setitem__(n, p) for n, p in self.exponent_dct.items()]
-        arr = self.coefficient * np.prod(independent_variable_arr ** exponent_arr, axis=1)
+        arr = self.coefficient * np.prod(variable_arr ** exponent_arr, axis=1)
         arr = arr.reshape(-1, 1).astype(np.float32)
         return arr
 

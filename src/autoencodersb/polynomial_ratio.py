@@ -29,14 +29,14 @@ class PolynomialRatio(object):
         Returns:
             PolynomialTerm: The resulting polynomial term after division.
         """
-        numerator_value = self.numerator.generate(independent_variable_arr)
-        denominator_value = self.denominator.generate(independent_variable_arr)
-        result = numerator_value / denominator_value
+        numerator_arr = self.numerator.generate(independent_variable_arr).reshape(-1)
+        denominator_arr = self.denominator.generate(independent_variable_arr).reshape(-1)
+        result = numerator_arr / denominator_arr
         return result.reshape(-1, 1)
 
     @classmethod 
     def makeHillPolynomialRatio(cls, variable: str, k: Optional[float] = None, n: float = 1) -> 'PolynomialRatio':
-        """Creates a Hill equation ratio: k * X^n / (1 + X^n).
+        """Creates a Hill equation ratio: X^n / (k + X^n).
         Note that by not specifying the argument n, we obtain a Michaelis-Menten expression.
 
         Args:
@@ -47,9 +47,10 @@ class PolynomialRatio(object):
         Returns:
             PolynomialRatio: The constructed Hill equation ratio.
         """
-        arg_dct = {k: k, f"e{variable}": n}
-        numerator_term = Term.make(**arg_dct)  # type: ignore
-        denominator_term = Term.make(**arg_dct)  # type: ignore
-        constant_term = Term.make()
+        variable_idx = variable.split("_")[1]
+        dct = {"k": 1, f"e{variable_idx}": n}
+        numerator_term = Term.make(**dct)  # type: ignore
+        denominator_term = Term.make(**dct)  # type: ignore
+        constant_term = Term.make(k=k)
         denominator_polynomial = Polynomial(terms=[constant_term, denominator_term])
         return cls(numerator=numerator_term, denominator=denominator_polynomial)
