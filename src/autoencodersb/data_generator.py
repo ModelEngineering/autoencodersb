@@ -56,6 +56,8 @@ class DataGenerator(object):
     def generate(self) -> DataLoader:
         """Generates the full synthetic dataset."""
         independent_df = self.variable_func(self.num_sample)
+        if len(independent_df) == 0:
+            raise ValueError("Independent variable function has not been specified.")
         # Make the DataFrame
         dependent_df = self.polynomial_collection.generate(independent_df.values)
         noise = np.random.normal(0, self.noise_std, dependent_df.shape)
@@ -129,16 +131,26 @@ class DataGenerator(object):
             ax.grid()
             plt.show()
 
-    def plotErrorDifference(self, other_df: pd.DataFrame, is_plot: bool = True) -> pd.DataFrame:
+    def plotErrorDifference(self, other_df: pd.DataFrame, x_column: Optional[str] = None,
+            is_plot: bool = True) -> pd.DataFrame:
         """
         Plots the error difference between the generated data and another DataGenerator's data.
             (other_df - self.data_df)/self.data_df
+            x_column (Optional[str]): The name of the column to use as the x-axis. Defaults to observation index
         """
+        if x_column is None:
+            xv = self.data_df.index.values
+        else:
+            xv = self.data_df[x_column].values
         error_df = (other_df - self.data_df)/self.data_df
+        error_df[x_column] = xv
         if is_plot:
             _, ax = plt.subplots()
-            error_df.plot(ax=ax)
-            ax.set_xlabel("time")
+            error_df.plot(ax=ax, x=x_column)
+            if x_column is None:
+                ax.set_xlabel("observation")
+            else:
+                ax.set_xlabel(x_column)
             ax.set_title("relative error")
             ax.grid()
             plt.show()

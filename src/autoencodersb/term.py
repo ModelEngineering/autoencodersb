@@ -47,7 +47,7 @@ class Term(object):
 
     @classmethod
     def make(cls, k: Optional[float] = None, k_min: float = 1.0,
-            k_max: float = 10.0, is_k_int: bool = True,**kwargs) -> 'Term':
+            k_max: float = 10.0, is_k_int: bool = True, **kwargs) -> 'Term':
         """
         Convenince method to make a term.
 
