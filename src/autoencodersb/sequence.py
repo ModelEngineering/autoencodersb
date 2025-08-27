@@ -10,10 +10,9 @@ from typing import List
 class Sequence(object):
     def __init__(self,
             rate: float = 1.0,
-            num_sample: int = 100,
-            initial_value: float = 0.0,
-            time_increment: float = 1.0,
-            density: float = 1.0,
+            start_time: float = 0.0,
+            end_time: float = 10.0,
+            num_point: int = 100,
             seq_type: str = cn.SEQ_LINEAR):
         """
         Args:
@@ -28,10 +27,9 @@ class Sequence(object):
                 integral_exponential: 1 - exp**-r*linear
         """
         self.rate = rate
-        self.num_sample = num_sample
-        self.initial_value = initial_value
-        self.time_increment = time_increment
-        self.density = density
+        self.num_point = num_point
+        self.start_time = start_time
+        self.end_time = end_time
         self.seq_type = seq_type
         if not seq_type in cn.SEQ_TYPES:
             raise ValueError(f"Unknown sequence type: {self.seq_type}")
@@ -43,18 +41,17 @@ class Sequence(object):
         Returns:
             np.ndarray: A 2D array containing the generated sequence.
         """
-        time_steps = np.arange(self.initial_value,
-                self.initial_value + self.num_sample * self.time_increment, self.time_increment)
+        time_arr = np.linspace(self.start_time, self.end_time, self.num_point)
         if self.seq_type == cn.SEQ_LINEAR:
-            result_arr = time_steps
+            result_arr = time_arr
         elif self.seq_type == cn.SEQ_EXPONENTIAL:
-            result_arr = self.initial_value + np.exp(-self.rate * time_steps)
+            result_arr = np.exp(-self.rate * time_arr)
         elif self.seq_type == cn.SEQ_INTEGRAL_EXPONENTIAL:
-            result_arr = self.initial_value + (1 - np.exp(-self.rate * time_steps)/self.rate)
+            result_arr = 1 - np.exp(-self.rate * time_arr)/self.rate
         else:
             raise ValueError(f"Unknown sequence type: {self.seq_type}")
         #
-        return result_arr.reshape(-1, 1)/self.density
+        return result_arr.reshape(-1, 1)
 
     def plot(self, ax=None, is_plot: bool = True) -> None:
         """

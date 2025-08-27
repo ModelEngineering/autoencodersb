@@ -5,12 +5,13 @@ from autoencodersb.dataset_csv import DatasetCSV
 from autoencodersb.polynomial_collection import PolynomialCollection  # type: ignore
 from autoencodersb.dataset_csv import DatasetCSV # type: ignore
 from autoencodersb.sequence import Sequence# type: ignore
+import autoencodersb.utils as utils  # type: ignore
 
 import matplotlib.pyplot as plt
 import numpy as np  # type: ignore
 from torch.utils.data import DataLoader
 import pandas as pd    # type: ignore
-from typing import List, Callable, Optional
+from typing import List, Callable, Optional, cast
 
 
 BATCH_SIZE_FRACTION = 0.1  # Fraction of the number of samples to use as batch size
@@ -105,11 +106,12 @@ class DataGenerator(object):
         def generate(num_sample: int) -> pd.DataFrame:
             # Generate a sequence of values
             if sequences is None:
-                new_sequences = [Sequence(num_sample=num_sample, **kwargs)]*self.polynomial_collection.num_variable
+                new_sequences = [Sequence(num_point=num_sample, **kwargs)]*self.polynomial_collection.num_variable
             else:
                 new_sequences = sequences
             arr = np.hstack([s.generate() for s in new_sequences]).reshape(num_sample, len(new_sequences))
-            columns = [f"X_{n}" for n in range(self.polynomial_collection.num_variable)]
+            num_variable = np.shape(arr)[1]
+            columns = [f"X_{n}" for n in range(num_variable)]
             df = pd.DataFrame(arr, columns=columns)
             return df
         #
@@ -132,7 +134,7 @@ class DataGenerator(object):
             plt.show()
 
     def plotErrorDifference(self, other_df: pd.DataFrame, x_column: Optional[str] = None,
-            is_plot: bool = True) -> pd.DataFrame:
+            ax = None, is_plot: bool = True) -> pd.Series:
         """
         Plots the error difference between the generated data and another DataGenerator's data.
             (other_df - self.data_df)/self.data_df
@@ -142,11 +144,11 @@ class DataGenerator(object):
             xv = self.data_df.index.values
         else:
             xv = self.data_df[x_column].values
-        error_df = (other_df - self.data_df)/self.data_df
-        error_df[x_column] = xv
+        error_arr = utils.calculateMaximumRelativeError(self.data_df.values, other_df.values)
         if is_plot:
-            _, ax = plt.subplots()
-            error_df.plot(ax=ax, x=x_column)
+            if ax is None:
+                _, ax = plt.subplots()
+            ax.plot(cast(np.ndarray, xv), error_arr)
             if x_column is None:
                 ax.set_xlabel("observation")
             else:
@@ -154,4 +156,4 @@ class DataGenerator(object):
             ax.set_title("relative error")
             ax.grid()
             plt.show()
-        return error_df
+        return pd.Series(error_arr, index=xv)

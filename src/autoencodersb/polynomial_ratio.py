@@ -33,7 +33,7 @@ class PolynomialRatio(object):
         denominator_arr = self.denominator.generate(independent_variable_arr).reshape(-1)
         result = numerator_arr / denominator_arr
         return result.reshape(-1, 1)
-
+    
     @classmethod 
     def makeHillPolynomialRatio(cls, variable: str, k: Optional[float] = None, n: float = 1) -> 'PolynomialRatio':
         """Creates a Hill equation ratio: X^n / (k + X^n).

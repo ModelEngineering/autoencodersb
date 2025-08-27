@@ -9,8 +9,8 @@ from torch.utils.data import DataLoader
 from typing import cast
 import unittest
 
-IGNORE_TESTS = True
-IS_PLOT = True
+IGNORE_TESTS = False
+IS_PLOT = False
 
 
 ########################################
@@ -48,7 +48,7 @@ class TestDataGenerator(unittest.TestCase):
         if IGNORE_TESTS:
             return
         for seq_type in cn.SEQ_TYPES:
-            sequences = [Sequence(num_sample=self.num_sample, seq_type=seq_type)]*self.polynomial_collection.num_variable
+            sequences = [Sequence(num_point=self.num_sample, seq_type=seq_type)]*self.polynomial_collection.num_variable
             self.generator.specifySequences(sequences=sequences)
             self.generator.generate()
             self.generator.plotGeneratedData(x_column="X_0", is_plot=IS_PLOT)
@@ -57,11 +57,11 @@ class TestDataGenerator(unittest.TestCase):
         if IGNORE_TESTS:
             return
         for seq_type in cn.SEQ_TYPES:
-            sequences = [Sequence(num_sample=self.num_sample, seq_type=seq_type)]*self.polynomial_collection.num_variable
+            sequences = [Sequence(num_point=self.num_sample, seq_type=seq_type)]*self.polynomial_collection.num_variable
             self.generator.specifySequences(sequences=sequences)
             self.generator.generate()
-            df = self.generator.plotErrorDifference(other_df=self.generator.data_df, is_plot=IS_PLOT)
-            mss = df.std().sum()
+            arr = self.generator.plotErrorDifference(other_df=self.generator.data_df, is_plot=IS_PLOT)
+            mss = np.std(arr)
             self.assertTrue(mss < 1e-3)
 
     def testNoNoise(self):
@@ -74,7 +74,7 @@ class TestDataGenerator(unittest.TestCase):
             is_third_order_term=False)
         num_sample = 200
         generator = DataGenerator(polynomial_collection=polynomial_collection, num_sample=num_sample)
-        sequences = [Sequence(num_sample=num_sample, seq_type=cn.SEQ_EXPONENTIAL, rate=0.001)]*polynomial_collection.num_variable
+        sequences = [Sequence(num_point=num_sample, seq_type=cn.SEQ_EXPONENTIAL, rate=0.001)]*polynomial_collection.num_variable
         generator.specifySequences(sequences=sequences)
         _ = generator.generate()
         noise_generator = DataGenerator(polynomial_collection=polynomial_collection,
@@ -87,8 +87,8 @@ class TestDataGenerator(unittest.TestCase):
         self.assertTrue((error_df*test_df).sum().sum() < 1e-3)
 
     def testNoise(self):
-        #if IGNORE_TESTS:
-        #    return
+        if IGNORE_TESTS:
+            return
         polynomial_collection = PolynomialCollection.make(
             is_mm_term=False,
             is_first_order_term=True,
@@ -96,7 +96,7 @@ class TestDataGenerator(unittest.TestCase):
             is_third_order_term=False)
         num_sample = 2000
         noise_var = 1
-        sequences = [Sequence(num_sample=num_sample, seq_type=cn.SEQ_EXPONENTIAL, rate=0.001)]*polynomial_collection.num_variable
+        sequences = [Sequence(num_point=num_sample, seq_type=cn.SEQ_EXPONENTIAL, rate=0.001)]*polynomial_collection.num_variable
         noise_generator = DataGenerator(polynomial_collection=polynomial_collection,
                 num_sample=num_sample, noise_std=np.sqrt(noise_var))
         noise_generator.specifySequences(sequences=sequences)

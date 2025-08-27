@@ -16,9 +16,9 @@ class TestSequence(unittest.TestCase):
 
     def testConstructor(self):
         self.assertEqual(self.sequence.rate, 1.0)
-        self.assertEqual(self.sequence.num_sample, 100)
-        self.assertEqual(self.sequence.initial_value, 0.0)
-        self.assertEqual(self.sequence.time_increment, 1.0)
+        self.assertEqual(self.sequence.num_point, 100)
+        self.assertEqual(self.sequence.start_time, 0.0)
+        self.assertEqual(self.sequence.end_time, 10.0)
         self.assertEqual(self.sequence.seq_type, cn.SEQ_LINEAR)
 
     def testGenerate(self):

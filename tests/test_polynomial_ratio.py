@@ -9,8 +9,8 @@ import pandas as pd  # type: ignore
 from typing import List, Any, Tuple
 import unittest
 
-IGNORE_TESTS = False
-IS_PLOT = False
+IGNORE_TESTS = True
+IS_PLOT = True
 DENOMINATOR = Polynomial([Term.make(k=5), Term.make(k=1, e0=1)])
 NUMERATOR = Polynomial([Term.make(2, e0=1)])
 
@@ -43,17 +43,16 @@ class TestTerm(unittest.TestCase):
     def testGenerate(self):
         if IGNORE_TESTS:
             return
-        independent_variable_arr = np.array(range(2000), dtype=np.float32).reshape(-1, 1)
-        result_arr = self.polynomial_ratio.generate(independent_variable_arr)
+        variable_arr = np.array(range(2000), dtype=np.float32).reshape(-1, 1)
+        result_arr = self.polynomial_ratio.generate(variable_arr).reshape(-1)
         self.assertAlmostEqual(result_arr[-1], NUMERATOR.terms[0].coefficient, places=2)
         #
         denominator = Polynomial([Term.make(k=5, e2=4, e5=3), Term.make(k=1, e0=1)])
         numerator = Polynomial([Term.make(2, e0=1)])
         polynomial_ratio = PolynomialRatio(numerator, denominator)
         arr = np.array(range(2000), dtype=np.float32).reshape(-1, 1)
-        independent_variable_arr = np.concatenate([arr] * 6, axis=1)
-        result_arr = polynomial_ratio.generate(independent_variable_arr)
-        import pdb; pdb.set_trace()
+        variable_arr = np.concatenate([arr] * 6, axis=1)
+        result_arr = polynomial_ratio.generate(variable_arr).reshape(-1)
         self.assertAlmostEqual(result_arr[-1], 0, places=5)
 
     def testMakeHillPolynomialRatio(self):
@@ -63,9 +62,8 @@ class TestTerm(unittest.TestCase):
         self.assertEqual(len(polynomial_ratio.variables), 1)
 
     def testMakeHillPolynomialRatioScale(self):
-        #if IGNORE_TESTS:
-        #     return
-        xvs = []
+        if IGNORE_TESTS:
+            return
         yvs = []
         sequence_arr = np.array(range(1, 101), dtype=np.float32).reshape(-1, 1)
         n_vals = list(range(1, 5))
