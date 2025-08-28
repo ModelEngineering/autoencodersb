@@ -102,11 +102,15 @@ class DataGenerator(object):
 
         Returns: List[Sequence]
         """
-        #
+        # Error checks
+        if 'num_point' in kwargs.keys():
+            import pdb; pdb.set_trace()
+            raise ValueError("num_point cannot be specified.")
+        ##
         def generate(num_sample: int) -> pd.DataFrame:
             # Generate a sequence of values
             if sequences is None:
-                new_sequences = [Sequence(num_point=num_sample, **kwargs)]*self.polynomial_collection.num_variable
+                new_sequences = [Sequence(num_point=self.num_sample, **kwargs)]*self.polynomial_collection.num_variable
             else:
                 new_sequences = sequences
             arr = np.hstack([s.generate() for s in new_sequences]).reshape(num_sample, len(new_sequences))
@@ -114,7 +118,7 @@ class DataGenerator(object):
             columns = [f"X_{n}" for n in range(num_variable)]
             df = pd.DataFrame(arr, columns=columns)
             return df
-        #
+        ##
         self.variable_func = generate
 
     def plotGeneratedData(self, is_plot: bool = True, x_column: Optional[str] = None) -> None:

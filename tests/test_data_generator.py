@@ -39,7 +39,7 @@ class TestDataGenerator(unittest.TestCase):
         dataloader = self.generator.generate()
         self.assertTrue(isinstance(dataloader, DataLoader))
         #
-        self.generator.specifySequences(seq_type=cn.SEQ_EXPONENTIAL, density=10)
+        self.generator.specifySequences(seq_type=cn.SEQ_EXPONENTIAL)
         dataloader = self.generator.generate()
         self.assertTrue(isinstance(dataloader, DataLoader))
         self.assertEqual(len(self.generator.data_df), self.num_sample)

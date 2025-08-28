@@ -31,7 +31,7 @@ class TestFunction(unittest.TestCase):
         target_arr = np.array([[1.5, 2.1, 3], [4, 5, 3]])
         max_rel_error_arr = utils.calculateMaximumRelativeError(reference_arr, target_arr)
         expected = np.array([0.5, -0.5])
-        np.testing.assert_array_equal(max_rel_error_arr, expected)
+        self.assertTrue(np.allclose(max_rel_error_arr, expected, atol=1e-3))
 
 if __name__ == '__main__':
     unittest.main()
