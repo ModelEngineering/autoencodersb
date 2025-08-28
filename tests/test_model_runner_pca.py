@@ -9,8 +9,8 @@ import pandas as pd    # type: ignore
 from typing import cast
 import unittest
 
-IGNORE_TESTS = True
-IS_PLOT = True
+IGNORE_TESTS = False
+IS_PLOT = False
 NUM_EPOCH = 5
 NUM_EPOCH = 20000
 

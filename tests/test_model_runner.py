@@ -4,16 +4,14 @@ from autoencodersb.autoencoder import Autoencoder  # type: ignore
 from tests.utils_test import makeAutocoderData  # type: ignore
 
 from copy import deepcopy
-import numpy as np  # type: ignore
 import pandas as pd # type: ignore
 import numpy as np
 import os
-import torch
 from torch.utils.data import DataLoader
 import unittest
 
-IGNORE_TESTS = True
-IS_PLOT = True
+IGNORE_TESTS = False
+IS_PLOT = False
 NUM_EPOCH = 20
 TARGET_COLUMN = "target"  # Assuming the target column is named 'target'
 NUM_DEPENDENT_FEATURE = 6
@@ -55,7 +53,6 @@ class TestModelRunner(unittest.TestCase):
         if IGNORE_TESTS:
             return
         error_df, max_error_ser = self.runner.makeRelativeError(TEST_DL)
-        import pdb; pdb.set_trace()
         self.assertIsInstance(error_df, pd.DataFrame)
         self.assertIsInstance(max_error_ser, pd.Series)
         self.assertEqual(len(error_df), len(max_error_ser))

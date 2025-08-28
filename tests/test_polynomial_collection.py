@@ -7,8 +7,8 @@ import autoencodersb.constants as cn  # type: ignore
 import numpy as np
 import unittest
 
-IGNORE_TESTS = True
-IS_PLOT = True
+IGNORE_TESTS = False
+IS_PLOT = False
 TERMS = [Term.make(k=2*n, e0=n) for n in range(3)]
 TERMS.append(Term.make(k=1, e4=3))
 
@@ -55,6 +55,14 @@ class TestPolynomialCollection(unittest.TestCase):
         self.assertEqual(str(collection).count("X_0"), 5)
         self.assertEqual(str(collection).count("X_1"), 2)
         self.assertEqual(str(collection).count("X_2"), 1)
+        #
+        collection = PolynomialCollection.make(is_mm_term=True,
+                is_first_order_term=40,
+                is_second_order_term=True,
+                is_third_order_term=600)
+        self.assertIsInstance(collection, PolynomialCollection)
+        self.assertTrue("40" in str(collection))
+        self.assertTrue("600" in str(collection))
 
 
 if __name__ == '__main__':

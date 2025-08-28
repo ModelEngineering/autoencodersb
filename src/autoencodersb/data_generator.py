@@ -104,7 +104,6 @@ class DataGenerator(object):
         """
         # Error checks
         if 'num_point' in kwargs.keys():
-            import pdb; pdb.set_trace()
             raise ValueError("num_point cannot be specified.")
         ##
         def generate(num_sample: int) -> pd.DataFrame:
@@ -112,6 +111,8 @@ class DataGenerator(object):
             if sequences is None:
                 new_sequences = [Sequence(num_point=self.num_sample, **kwargs)]*self.polynomial_collection.num_variable
             else:
+                if len(sequences) != self.polynomial_collection.num_variable:
+                    raise ValueError(f"Expected {self.polynomial_collection.num_variable} sequences, but got {len(sequences)}.")
                 new_sequences = sequences
             arr = np.hstack([s.generate() for s in new_sequences]).reshape(num_sample, len(new_sequences))
             num_variable = np.shape(arr)[1]

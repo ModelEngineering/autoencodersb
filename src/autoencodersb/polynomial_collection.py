@@ -6,7 +6,7 @@ from autoencodersb.polynomial import Polynomial  # type: ignore
 
 import numpy as np
 import pandas as pd # type: ignore
-from typing import List, Union
+from typing import List, Union, Tuple
 
 """
 Creates synthetic data that are polynomials in an independent variable or ratios of polynomials.
@@ -45,10 +45,10 @@ class PolynomialCollection(object):
 
     @classmethod
     def make(cls,
-            is_mm_term: bool=True,
-            is_first_order_term: bool = True,
-            is_second_order_term: bool = True,
-            is_third_order_term: bool = True,
+            is_mm_term: Union[bool, float]=True,
+            is_first_order_term: Union[bool, float] = True,
+            is_second_order_term: Union[bool, float] = True,
+            is_third_order_term: Union[bool, float] = True,
     ) -> 'PolynomialCollection':
         """
         Creates a PolynomialCollection from the specified parameters.
@@ -62,17 +62,27 @@ class PolynomialCollection(object):
         Returns:
             PolynomialCollection: The constructed PolynomialCollection.
         """
+        ##
+        def getK(k_arg: Union[bool, float]) -> Tuple[bool, Union[float, None]]:
+            if isinstance(k_arg, bool):
+                return k_arg, None
+            return True, k_arg
+        ##
         terms:list = []
-        if is_mm_term:
+        is_mm, k_arg = getK(is_mm_term)
+        if is_mm:
             # k*X_0/(1 + k'X_0)
             denominator = Polynomial([Term.make(k=1), Term.make(e0=1)])
-            numerator = Polynomial([Term.make(e0=1)])
+            numerator = Polynomial([Term.make(k=k_arg, e0=1)])
             polynomial_ratio = PolynomialRatio(numerator, denominator)
             terms.append(polynomial_ratio)
-        if is_first_order_term:
-            terms.append(Term.make(e0=1))
-        if is_second_order_term:
-            terms.append(Term.make(e0=1, e1=1))
-        if is_third_order_term:
-            terms.append(Term.make(e0=1, e1=1, e2=1))
+        is_first_order, k_arg = getK(is_first_order_term)
+        if is_first_order:
+            terms.append(Term.make(k=k_arg, e0=1))
+        is_second_order, k_arg = getK(is_second_order_term)
+        if is_second_order:
+            terms.append(Term.make(k=k_arg, e0=1, e1=1))
+        is_third_order, k_arg = getK(is_third_order_term)
+        if is_third_order:
+            terms.append(Term.make(k=k_arg, e0=1, e1=1, e2=1))
         return cls(terms)

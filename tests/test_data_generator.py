@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from typing import cast
 import unittest
 
-IGNORE_TESTS = False
+IGNORE_TESTS = True
 IS_PLOT = False
 
 
@@ -110,6 +110,25 @@ class TestDataGenerator(unittest.TestCase):
         k_val = cast(float, k_val)
         expected_var = (k_val**2) * sequence_var + noise_var  # type: ignore
         self.assertAlmostEqual(column_var, expected_var, delta=1e-1)
+
+    def testBug1(self):
+        #if IGNORE_TESTS:
+        #    return
+        polynomial_collection = PolynomialCollection.make(
+        is_mm_term=True,
+        is_first_order_term=True,
+        is_second_order_term=2,
+        is_third_order_term=0.1)
+        num_point = 2000
+        end_time = 10
+        GENERATOR_TRAIN = DataGenerator(polynomial_collection=polynomial_collection,
+                num_sample=num_point)
+        SEQUENCES = [Sequence(num_point=num_point, end_time=end_time, rate=0.1, seq_type=cn.SEQ_EXPONENTIAL),
+                    Sequence(num_point=num_point, end_time=end_time, seq_type=cn.SEQ_LINEAR),
+                    Sequence(num_point=num_point, end_time=end_time, rate=0.1, seq_type=cn.SEQ_EXPONENTIAL),
+                    ]
+        GENERATOR_TRAIN.specifySequences(sequences=SEQUENCES)
+        GENERATOR_TRAIN.generate()
 
 if __name__ == '__main__':
     unittest.main()

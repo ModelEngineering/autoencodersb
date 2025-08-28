@@ -9,8 +9,8 @@ import pandas as pd  # type: ignore
 from typing import List, Any, Tuple
 import unittest
 
-IGNORE_TESTS = True
-IS_PLOT = True
+IGNORE_TESTS = False
+IS_PLOT = False
 DENOMINATOR = Polynomial([Term.make(k=5), Term.make(k=1, e0=1)])
 NUMERATOR = Polynomial([Term.make(2, e0=1)])
 
@@ -32,8 +32,8 @@ class TestTerm(unittest.TestCase):
         self.assertEqual(len(polynomial_ratio.variables), 3)
 
     def testRepr(self):
-        #if IGNORE_TESTS:
-        #    return
+        if IGNORE_TESTS:
+            return
         ratio_str = str(self.polynomial_ratio)
         slash_pos = ratio_str.find("/")
         self.assertNotEqual(slash_pos, -1)

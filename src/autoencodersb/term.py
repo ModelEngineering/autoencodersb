@@ -43,7 +43,10 @@ class Term(object):
             raise ValueError("Input must be a 2D array")
         # Evaluate the term by multiplying the coefficient with the independent variables raised to the appropriate powers
         exponent_arr = np.zeros(variable_arr.shape[1])
-        [exponent_arr.__setitem__(n, p) for n, p in self.exponent_dct.items()]
+        try:
+            [exponent_arr.__setitem__(n, p) for n, p in self.exponent_dct.items()]
+        except Exception as e:
+            import pdb; pdb.set_trace()  # noqa:
         arr = self.coefficient * np.prod(variable_arr ** exponent_arr, axis=1)
         arr = arr.reshape(-1, 1).astype(np.float32)
         return arr
@@ -68,7 +71,6 @@ class Term(object):
         try:
             _ = [float(v[1:]) for v in kwargs.keys()]
         except ValueError:
-            import pdb; pdb.set_trace()
             raise ValueError("Invalid exponent format. Use e<int>.")
         # Calculate the coefficient
         if k is None:
