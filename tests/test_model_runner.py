@@ -1,4 +1,4 @@
-from autoencodersb.model_runner_nn import ModelRunnerNN, RunnerResultPredict  # type: ignore
+from autoencodersb.model_runner_nn import ModelRunnerNN  # type: ignore
 from autoencodersb.model_runner import RunnerResult  # type: ignore
 from autoencodersb.autoencoder import Autoencoder  # type: ignore
 from tests.utils_test import makeAutocoderData  # type: ignore

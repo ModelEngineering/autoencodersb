@@ -1,23 +1,24 @@
-'''This module trains, runs a visualizes a fully connected autoencoder on the MNIST dataset.'''
+'''Trains an autoencoder that uses UMAP for the encoding.'''
 
-import autoencodersb.constants as cn
+from autoencodersb.autoencoder import Autoencoder  # type: ignore
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
-import torchvision # type: ignore
+import umap # type: ignore
 import torchvision.transforms as transforms     # type: ignore
-from typing import List
+from typing import List, cast
 import matplotlib.pyplot as plt
 
 LAYER_DIMENSIONS = [784, 512, 256, 128, 64]  # Example dimensions for MNIST
 
 
-class Autoencoder(nn.Module):
+class AutoencoderUMAP(Autoencoder):
     # Basic Autoencoder
-    def __init__(self, layer_dimensions: List[int]):
+    def __init__(self, layer_dimensions: List[int], n_neighbors: int = 15):
         """
 
         Args:
@@ -30,12 +31,9 @@ class Autoencoder(nn.Module):
         self.input_dim = layer_dimensions[0]
         self.encoding_dim = layer_dimensions[-1]
         # Calculate dimension of hidden layer
-        # Encoder
-        encoder_layers:list = []
-        for idx in range(len(layer_dimensions) - 1):
-            encoder_layers.append(nn.Linear(layer_dimensions[idx], layer_dimensions[idx + 1]))
-            encoder_layers.append(nn.ReLU())
-        self.encoder = nn.Sequential(*encoder_layers[0:-1]) 
+        # UMAP Encoder
+        self.encoder = umap.UMAP(n_neighbors=n_neighbors, min_dist=0.1,
+                n_components=layer_dimensions[-1])
         # Decoder
         decoder_layers:list = []
         for idx in range(len(layer_dimensions) - 1, 0, -1):
@@ -52,9 +50,10 @@ class Autoencoder(nn.Module):
 
     def encode(self, x:torch.Tensor) -> torch.Tensor:
         """Get encoded representation"""
-        decoded = self.encoder(x)
-        return torch.Tensor(decoded)
-    
+        data_arr = cast(np.ndarray, x.detach().cpu().numpy())
+        encoded_tnsr = torch.Tensor(self.encoder.fit_transform(data_arr)) # type: ignore
+        return encoded_tnsr
+
     def decode(self, x:torch.Tensor) -> torch.Tensor:
         """Decode from encoded representation"""
         return self.decoder(x)

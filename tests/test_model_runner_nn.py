@@ -1,5 +1,5 @@
 from autoencodersb.dataset_csv import DatasetCSV # type: ignore
-from autoencodersb.model_runner_nn import ModelRunnerNN, RunnerResultPredict  # type: ignore
+from autoencodersb.model_runner_nn import ModelRunnerNN, RunnerResult  # type: ignore
 from autoencodersb.model_runner import RunnerResult  # type: ignore
 from autoencodersb.autoencoder import Autoencoder  # type: ignore
 import autoencodersb.constants as cn  # type: ignore
@@ -48,7 +48,7 @@ class TestModelRunner(unittest.TestCase):
         if IGNORE_TESTS:
             return
         result = self.runner.fit(TRAIN_DL)
-        self.assertIsInstance(result, RunnerResultPredict)
+        self.assertIsInstance(result, RunnerResult)
         self.assertIsInstance(result.losses, list)
     
     def testPredict(self):

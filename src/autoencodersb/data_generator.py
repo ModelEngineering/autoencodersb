@@ -49,8 +49,8 @@ class DataGenerator(object):
         self.noise_std = noise_std
         self.is_shuffle = is_shuffle
         self.variable_func: Callable[[int], pd.DataFrame] = lambda x: pd.DataFrame(np.array([]))
-        # Calculated
-        self.data_df = pd.DataFrame()  # Updated by generate
+        # Updated during fit
+        self.data_df = pd.DataFrame()
         self.data_dl = DataLoader(DatasetCSV(csv_input=self.data_df, target_column=None),
                 shuffle=self.is_shuffle, batch_size=10)
 

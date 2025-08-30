@@ -22,30 +22,26 @@ ACCURACY_WEIGHT = 1  # Weight in loss function for accuracy
 """
 
 
-
-class RunnerResultPredict(RunnerResult):
+class RunnerResultNN(RunnerResult):
     """Result of the model runner."""
     def __init__(self, avg_loss: float, losses: list, num_epochs: int):
         super().__init__(avg_loss, losses)
         self.num_epochs = num_epochs
 
 
-class RunnerResultFit(RunnerResultPredict):
-    def __init__(self, avg_loss: float, losses: list, num_epochs: int,
-            mi_input_hidden1_epochs: list, mi_hidden2_output_epochs: list, accuracies: list):
-        super().__init__(avg_loss, losses, num_epochs)
-        self.mi_input_hidden1_epochs = mi_input_hidden1_epochs
-        self.mi_hidden2_output_epochs = mi_hidden2_output_epochs
-        self.accuracies = accuracies
-
-
 class ModelRunnerNN(ModelRunner):
     # Runner for Autoencoder
 
-    def __init__(self, model: nn.Module, num_epoch:int=3, learning_rate:float=1e-3,
-                criterion:nn.Module=nn.MSELoss(), max_fractional_error: float=0.10,
+    def __init__(self,
+                model: nn.Module,
+                num_epoch:int=3,
+                learning_rate:float=1e-3,
+                criterion:nn.Module=nn.MSELoss(),
+                max_fractional_error: float=0.10,
                 is_normalized:bool=True, 
-                noise_std: float=0.1, is_l1_regularization:bool=True, is_accuracy_regularization:bool=True,
+                noise_std: float=0.1,
+                is_l1_regularization:bool=True,
+                is_accuracy_regularization:bool=True,
                 is_report:bool=False):
         """
         Args:
@@ -118,8 +114,7 @@ class ModelRunnerNN(ModelRunner):
         smoothed_inaccuracy = np.mean(mae_arr)
         return smoothed_inaccuracy
 
-    # FIXME: Don't do random permutations for paths. Pick random start points sufficient for a given sequence length
-    def fit(self, train_dl: Optional[DataLoader]=None, num_epoch: Optional[int]=None) -> RunnerResultPredict:
+    def fit(self, train_dl: Optional[DataLoader]=None, num_epoch: Optional[int]=None) -> RunnerResultNN:
         """
         Train the model. All calculations are on the accelerator device.
         Models can be fit incrementally.
@@ -214,9 +209,7 @@ class ModelRunnerNN(ModelRunner):
         self.last_epoch = self.num_epoch
         #
         avg_loss = cast(float, np.mean(losses))
-        return RunnerResultFit(avg_loss=avg_loss, losses=losses, num_epochs=self.num_epoch,
-                mi_input_hidden1_epochs=mi_hidden1_input_epochs,
-                mi_hidden2_output_epochs=mi_hidden2_output_epochs, accuracies=accuracies)
+        return RunnerResultNN(avg_loss=avg_loss, losses=losses, num_epochs=self.num_epoch)
 
     def predict(self, feature_tnsr: torch.Tensor) -> torch.Tensor:
         """Predicts the target for the features.

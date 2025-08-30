@@ -33,6 +33,8 @@ class PolynomialCollection(object):
         self.variables = list(set(self.variables))
         self.num_variable = np.max(self.variables) + 1  # X_0 is a variable.
         self.term_strs = [str(t) for t in self.terms]
+        # Number of columns in the output
+        self.num_output = self.num_variable + len(self.term_strs)
 
     def __repr__(self):
         return ",  ".join([str(t) for t in self.terms])

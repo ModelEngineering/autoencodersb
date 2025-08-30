@@ -92,19 +92,24 @@ class ModelRunner(object):
     def evaluate(self, test_loader: DataLoader) -> RunnerResult:
         """Assess the model on a test dataset."""
         test_losses = []
+        total_absolute_error = 0.0
+        num_dim = test_loader.dataset.data_df.shape[1]  # type: ignore
         #
         with torch.no_grad():
             for (feature_tnsr, target_tnsr) in list(test_loader):
                 feature_tnsr = feature_tnsr.view(feature_tnsr.size(0), -1)
                 prediction_tnsr = self.predict(feature_tnsr)
+                total_absolute_error += torch.sum(torch.abs(prediction_tnsr.to(cn.CPU) - target_tnsr)).item()
                 loss = self.criterion(prediction_tnsr.to(cn.CPU), target_tnsr)
                 test_losses.append(loss.item())
         
         avg_test_loss = cast(float, np.mean(test_losses))
+        mean_absolute_error = total_absolute_error / (num_dim * len(test_loader.dataset)) # type: ignore
         if self.is_report:
             print(f'Test Loss: {avg_test_loss:.4f}')
         #
-        return RunnerResult(avg_loss=avg_test_loss, losses=test_losses)
+        return RunnerResult(avg_loss=avg_test_loss, losses=test_losses,
+                mean_absolute_error=mean_absolute_error)
 
     def run(self, train_loader: DataLoader, test_loader: DataLoader)->Tuple[RunnerResult, RunnerResult]:
         """Trains and evaluates the model.
@@ -147,9 +152,11 @@ class ModelRunner(object):
         value_arr[is_max_arr] = max_arr[is_max_arr]
         return error_df, pd.Series(value_arr)
     
-    def plotEvaluate(self, test_loader: DataLoader, ax=None, is_plot: bool = True):
+    def plotEvaluate(self, test_loader: DataLoader, ax=None, y_lim: Optional[Tuple[float, float]] = None,
+            is_plot: bool = True):
         """Plot the evaluation results.
             ax (Optional[plt.Axes]): Matplotlib axes to plot on.
+            y_lim (Optional[Tuple[float, float]]): Y-axis limits for the plot.
         """
         plot_df, _ = self.makeRelativeError(test_loader)
         columns = list(plot_df.columns)
@@ -163,6 +170,8 @@ class ModelRunner(object):
         ax.set_title(f"{len(plot_df)} Relative Prediction Errors")
         ax.set_xlabel("features")
         ax.set_ylabel("fractional Error relative to true target")
+        if y_lim is not None:
+            ax.set_ylim(y_lim)
         plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
         if is_plot:
             plt.show()

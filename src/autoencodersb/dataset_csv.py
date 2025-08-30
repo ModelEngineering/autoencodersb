@@ -23,7 +23,7 @@ class DatasetCSV(Dataset):
             self.data_df = pd.read_csv(csv_input)
         self.target_column = target_column
         feature_columns = [col for col in self.data_df.columns if col != target_column]
-        self.feature_tnsr = torch.tensor(self.data_df[feature_columns].values)
+        self.feature_tnsr = torch.tensor(self.data_df[feature_columns].values.astype(np.float32))
         if target_column is None:
             self.target_tnsr = self.feature_tnsr.detach().clone()  # Use features as target if no target column
         else:

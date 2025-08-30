@@ -1,4 +1,4 @@
-from autoencodersb.autoencoder import Autoencoder  # type: ignore
+from autoencodersb.autoencoder_umap import AutoencoderUMAP  # type: ignore
 
 import numpy as np
 import torch
@@ -11,13 +11,13 @@ IS_PLOT = False
 class TestAutoencoder(unittest.TestCase):
 
     def setUp(self):
-        self.autoencoder = Autoencoder(layer_dimensions=[784, 512, 256, 128, 64])
+        self.autoencoder = AutoencoderUMAP(layer_dimensions=[784, 512, 256, 128, 64])
 
     def testConstructor(self):
         """Test the constructor."""
         if IGNORE_TESTS:
             return
-        self.assertIsInstance(self.autoencoder, Autoencoder)
+        self.assertIsInstance(self.autoencoder, AutoencoderUMAP)
         self.assertEqual(self.autoencoder.input_dim, 784)
 
     def testEncode(self):

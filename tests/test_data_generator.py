@@ -115,10 +115,11 @@ class TestDataGenerator(unittest.TestCase):
         #if IGNORE_TESTS:
         #    return
         polynomial_collection = PolynomialCollection.make(
-        is_mm_term=True,
-        is_first_order_term=True,
-        is_second_order_term=2,
-        is_third_order_term=0.1)
+                is_mm_term=True,
+                is_first_order_term=True,
+                is_second_order_term=2,
+                is_third_order_term=0.1
+        )
         num_point = 2000
         end_time = 10
         GENERATOR_TRAIN = DataGenerator(polynomial_collection=polynomial_collection,
