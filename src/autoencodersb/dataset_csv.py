@@ -8,17 +8,25 @@ from typing import Optional, Union
 
 
 class DatasetCSV(Dataset): 
-    def __init__(self, csv_input:Union[str, pd.DataFrame], target_column:Optional[str]=None, transform=None):
+    def __init__(self, csv_input:Union[str, pd.DataFrame, np.ndarray],
+            target_column:Optional[str]=None, transform=None):
         """
         All columns except the target column are considered features.
 
         Args:
-            csv_file (Union[pd.DataFrame, str]): Path to CSV file
+            csv_file (Union[pd.DataFrame, str]): Path to CSV file, dataframe, NamedArray
             target_column (str): Name of target column. If None, use feature columns
             transform (callable, optional): Optional transform to be applied on features
         """
         if isinstance(csv_input, pd.DataFrame):
             self.data_df = csv_input
+        elif isinstance(csv_input, np.ndarray):
+            self.data_df = pd.DataFrame(csv_input)
+            import pdb; pdb.set_trace()
+            if hasattr(csv_input, "colnames"):
+                self.data_df.columns = csv_input.colnames # type: ignore
+            else:
+                self.data_df.columns = [f"col_{i}" for i in range(csv_input.shape[1])]
         else:
             self.data_df = pd.read_csv(csv_input)
         self.target_column = target_column

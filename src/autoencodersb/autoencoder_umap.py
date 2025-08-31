@@ -38,7 +38,8 @@ class AutoencoderUMAP(Autoencoder):
         decoder_layers:list = []
         for idx in range(len(layer_dimensions) - 1, 0, -1):
             decoder_layers.append(nn.Linear(layer_dimensions[idx], layer_dimensions[idx - 1]))
-            decoder_layers.append(nn.ReLU())
+            #decoder_layers.append(nn.ReLU())
+            decoder_layers.append(nn.Sigmoid())
         self.decoder = nn.Sequential(*decoder_layers[0:-1])
 
     def forward(self, x:torch.Tensor) -> torch.Tensor:

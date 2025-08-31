@@ -38,7 +38,7 @@ class RunnerResult(object):
 class ModelRunner(object):
     # Runner for Autoencoder
 
-    def __init__(self, model:object, criterion:nn.Module=nn.MSELoss(), is_report:bool=False):
+    def __init__(self, model:object, is_report:bool=False):
         """
         Args:
             model (nn.Module): The model to train.
@@ -46,7 +46,7 @@ class ModelRunner(object):
             is_report (bool): Whether to print progress during training.    
         """
         self.model = model
-        self.criterion = criterion
+        self.criterion = nn.MSELoss(reduction='mean')
         self.is_report = is_report
         self.train_dl: Union[None, DataLoader] = None
         # Calculated state

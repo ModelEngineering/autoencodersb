@@ -2,6 +2,9 @@
 
 import autoencodersb.constants as cn  # type: ignore
 from autoencodersb.model_runner import ModelRunner, RunnerResult  # type: ignore
+# The following are needed for deserialize
+from autoencodersb.autoencoder import Autoencoder  # type: ignore
+from autoencodersb.autoencoder_umap import AutoencoderUMAP  # type: ignore
 
 from copy import deepcopy
 import numpy as np
@@ -34,15 +37,15 @@ class ModelRunnerNN(ModelRunner):
 
     def __init__(self,
                 model: nn.Module,
-                num_epoch:int=3,
-                learning_rate:float=1e-3,
-                criterion:nn.Module=nn.MSELoss(),
+                is_report: bool=False,
+                num_epoch: int=3,
+                learning_rate: float=1e-3,
                 max_fractional_error: float=0.10,
-                is_normalized:bool=True, 
-                noise_std: float=0.1,
-                is_l1_regularization:bool=True,
-                is_accuracy_regularization:bool=True,
-                is_report:bool=False):
+                is_normalized: bool=True, 
+                noise_std: float=0,
+                is_l1_regularization: bool=True,
+                is_accuracy_regularization: bool=True,
+                ): 
         """
         Args:
             model (nn.Module): Model being run
@@ -59,7 +62,7 @@ class ModelRunnerNN(ModelRunner):
             is_report (bool, optional): Print text for progress.
                                         Defaults to False.
         """
-        super().__init__(model, criterion=criterion, is_report=is_report)
+        super().__init__(model, is_report=is_report)
         self.model = model.to(cn.DEVICE)
         self.num_epoch = num_epoch
         self.learning_rate = learning_rate
@@ -244,6 +247,8 @@ class ModelRunnerNN(ModelRunner):
             loss_tnsr: torch.Tensor = torch.tensor(np.inf)):
         """Serializes a model checkpoint."""
         checkpoint_dct = {
+            'model_class': self.model.__class__.__name__,
+            'layer_dimensions': self.model.layer_dimensions,  # type: ignore
             'model': cast(nn.Module, self.model).state_dict(),
             'num_epoch': self.num_epoch,
             'learning_rate': self.learning_rate,
@@ -264,10 +269,12 @@ class ModelRunnerNN(ModelRunner):
         torch.save(checkpoint_dct, path)
 
     @classmethod
-    def deserialize(cls, untrained_model: nn.Module, path: str) -> 'ModelRunnerNN':
+    def deserialize(cls, path: str) -> 'ModelRunnerNN':
         """Deserializes the model runner from a file."""
         checkpoint_dct = torch.load(path, weights_only=False)
-        untrained_model.load_state_dict(checkpoint_dct['model_state_dict'])
+        # Retrieve information from checkpoint
+        model_class = checkpoint_dct['model_class']
+        layer_dimensions = checkpoint_dct['layer_dimensions']
         num_epoch = checkpoint_dct['num_epoch']
         learning_rate = checkpoint_dct['learning_rate']
         is_normalized = checkpoint_dct['is_normalized']
@@ -276,11 +283,15 @@ class ModelRunnerNN(ModelRunner):
         is_l1_regularization = checkpoint_dct['is_l1_regularization']
         is_accuracy_regularization = checkpoint_dct['is_accuracy_regularization']
         train_dl = checkpoint_dct.get('train_dl', None)
+        # Construct the model
+        untrained_model = eval(f"{model_class}({layer_dimensions})")
+        untrained_model.load_state_dict(checkpoint_dct['model_state_dict'])
+        # Construct the runner
         runner = cls(model=untrained_model, num_epoch=num_epoch, learning_rate=learning_rate,
                 is_normalized=is_normalized, max_fractional_error=max_fractional_error,
                 noise_std=noise_std, is_l1_regularization=is_l1_regularization,
                 is_accuracy_regularization=is_accuracy_regularization,
-                criterion=checkpoint_dct['criterion'])
+                )
         #
         feature_std_tnsr = checkpoint_dct['feature_std_tnsr'].detach().clone()
         target_std_tnsr = checkpoint_dct['target_std_tnsr'].detach().clone()

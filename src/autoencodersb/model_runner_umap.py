@@ -54,23 +54,26 @@ class ModelRunnerUMAP(ModelRunnerNN):
             self.train_dl = train_dl # type: ignore
         # Get tensors for training
         data_df = utils.dataloaderToDataframe(train_dl)
+        std_tnsr = torch.Tensor(data_df.std().values).to(cn.DEVICE)
         data_tnsr = torch.Tensor(data_df.values)
         full_feature_tnsr = self.model.encode(data_tnsr.to(cn.DEVICE))  # type: ignore
         full_target_tnsr = data_tnsr.to(cn.DEVICE)
         num_sample = full_feature_tnsr.size(0)
+        num_dimension = full_feature_tnsr.size(1)
         # Initialize for training
         losses = []
-        avg_loss = 1e10
+        loss_std = 1e10
         epoch_loss = np.inf
         batch_size = train_dl.batch_size
         # Training loop
-        pbar = tqdm(range(self.last_epoch, self.num_epoch), desc=f"-logloss={avg_loss:.4f})")
+        pbar = tqdm(range(self.last_epoch, self.num_epoch), desc=f"loss (std)={loss_std:.4f})")
         for epoch in pbar:
             permutation = torch.randperm(num_sample)
             batch_size = cast(int, batch_size)
             num_batch = num_sample // batch_size
-            pbar.set_description_str(f"epochs (-logloss={-np.log10(avg_loss):.4f})")
+            pbar.set_description_str(f"epochs (loss (std)={loss_std:.4f})")
             epoch_loss = 0
+            total_mse = 0
             for iter in range(num_batch):
                 idx_tnsr = permutation[iter*batch_size:(iter+1)*batch_size]
                 # Transform the feature and target tensors
@@ -80,21 +83,24 @@ class ModelRunnerUMAP(ModelRunnerNN):
                 target_tnsr = target_tnsr + torch.randn_like(target_tnsr) * self.noise_std
                 # Forward pass
                 prediction_tnsr = cast(nn.Module, self.model).decode(feature_tnsr) # type: ignore
-                loss = self.criterion(prediction_tnsr, target_tnsr)
+                l1_loss = self._l1_regularization()
+                reconstruction_loss = self.criterion(prediction_tnsr/std_tnsr, target_tnsr/std_tnsr)
+                loss = reconstruction_loss + l1_loss
                 # Backward pass
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
                 #
                 epoch_loss += loss.item()
-            # Record results of epoch
-            avg_loss = epoch_loss / len(train_dl)
-            losses.append(avg_loss)
+                total_mse += prediction_tnsr.size(0)*reconstruction_loss.item()
+            # loss_std is in units of standard deviation
+            loss_std = np.sqrt(total_mse / num_sample)
+            losses.append(loss_std)
             if self.is_report:
-                print(f'Epoch [{epoch+1}/{self.num_epoch}], Loss: {avg_loss:.4f}')
+                print(f'Epoch [{epoch+1}/{self.num_epoch}], Loss: {loss_std:.4f}')
         self.last_epoch = self.num_epoch
         #
-        return RunnerResultNN(avg_loss=avg_loss, losses=losses, num_epochs=self.num_epoch)
+        return RunnerResultNN(avg_loss=loss_std, losses=losses, num_epochs=self.num_epoch)
 
     def predict(self, feature_tnsr: torch.Tensor) -> torch.Tensor:
         """Predicts the target for the features.
