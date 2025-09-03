@@ -52,9 +52,9 @@ class Autoencoder(nn.Module):
 
     def encode(self, x:torch.Tensor) -> torch.Tensor:
         """Get encoded representation"""
-        decoded = self.encoder(x)
-        return torch.Tensor(decoded)
-    
+        encoded = self.encoder(x)
+        return torch.Tensor(encoded)
+
     def decode(self, x:torch.Tensor) -> torch.Tensor:
         """Decode from encoded representation"""
         return self.decoder(x)

@@ -34,6 +34,7 @@ class RunnerResultNN(RunnerResult):
 
 class ModelRunnerNN(ModelRunner):
     # Runner for Autoencoder
+    model_cls = Autoencoder
 
     def __init__(self,
                 model: nn.Module,
@@ -72,7 +73,6 @@ class ModelRunnerNN(ModelRunner):
         self.is_l1_regularization = is_l1_regularization
         self.is_accuracy_regularization = is_accuracy_regularization
         #
-        self.train_dl = None  # Optional[DataLoader] used to train the model
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         self.last_epoch = 0 # Support for incremental training
 
@@ -112,7 +112,8 @@ class ModelRunnerNN(ModelRunner):
         prediction_arr = prediction_tnsr.cpu().numpy()
         target_arr = target_tnsr.cpu().numpy()
         # Find deiviations handling small and large predictions
-        mae_arr = np.max(np.abs(prediction_arr - target_arr) / target_arr, axis=1)
+        idx_arr = np.sum(target_arr == 0, axis=1) == 0 # rows where there is no zero
+        mae_arr = np.max(np.abs(prediction_arr[idx_arr, :] - target_arr[idx_arr, :]) / target_arr[idx_arr, :], axis=1)
         # Smooth the inaccuracy
         smoothed_inaccuracy = np.mean(mae_arr)
         return smoothed_inaccuracy
@@ -169,12 +170,12 @@ class ModelRunnerNN(ModelRunner):
         epoch_loss = np.inf
         batch_size = train_dl.batch_size
         # Training loop
-        pbar = tqdm(range(self.last_epoch, self.num_epoch), desc=f"epochs (accuracy/-logloss={accuracy:.2f}/{avg_loss:.4f})")
+        pbar = tqdm(range(self.last_epoch, self.num_epoch), desc=f"epochs (accuracy/loss={accuracy:.2f}/{avg_loss:.4f})")
         for epoch in pbar:
             permutation = torch.randperm(num_sample)
             batch_size = cast(int, batch_size)
             num_batch = num_sample // batch_size
-            pbar.set_description_str(f"epochs (accuracy/-logloss={accuracy:.2f}/{-np.log10(avg_loss):.4f})")
+            pbar.set_description_str(f"epochs (accuracy/loss={accuracy:.2f}/{avg_loss:.4f})")
             epoch_loss = 0
             for iter in range(num_batch):
                 idx_tnsr = permutation[iter*batch_size:(iter+1)*batch_size]

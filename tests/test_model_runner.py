@@ -1,12 +1,16 @@
 from autoencodersb.model_runner_nn import ModelRunnerNN  # type: ignore
-from autoencodersb.model_runner import RunnerResult  # type: ignore
+from autoencodersb.model_runner_umap import ModelRunnerUMAP  # type: ignore
+from autoencodersb.model_runner_pca import ModelRunnerPCA  # type: ignore
+from autoencodersb.model_runner import ModelRunner, RunnerResult  # type: ignore
 from autoencodersb.autoencoder import Autoencoder  # type: ignore
+from autoencodersb.autoencoder_umap import AutoencoderUMAP  # type: ignore
 from tests.utils_test import makeAutocoderData  # type: ignore
 
 from copy import deepcopy
 import pandas as pd # type: ignore
 import numpy as np
 import os
+import tellurium as te  # type: ignore
 from torch.utils.data import DataLoader
 import unittest
 
@@ -34,7 +38,8 @@ TEST_DIR = os.path.abspath(os.path.dirname(__file__))
 TRAINED_RUNNER = ModelRunnerNN(model=MODEL, num_epoch=NUM_EPOCH,
                 learning_rate=1e-5, is_normalized=True,
                 max_fractional_error=0.1)
-_ = TRAINED_RUNNER.fit(TRAIN_DL)
+if not IGNORE_TESTS:
+    _ = TRAINED_RUNNER.fit(TRAIN_DL)
 
 
 class TestModelRunner(unittest.TestCase):
@@ -59,6 +64,34 @@ class TestModelRunner(unittest.TestCase):
         trues = [s in v for s, v in zip(max_error_ser.values, error_df.values)]
         self.assertTrue(all(trues))
 
+    def makeFromAntimony(self, cls, num_epoch=5) -> ModelRunner:
+        ant_str = """
+        A -> B; A
+        B -> C; 2*B
+        C -> D; 3*C
+        D -> E; 4*D
+        $A = 10
+        B = 0
+        C = 0
+        D = 0
+        E = 0
+        """
+        runner = cls.makeFromAntimony(ant_str, selections=["B", "C", "D"], num_epoch=num_epoch)
+        self.assertIsInstance(runner, cls)
+        self.assertGreater(len(runner.train_runner_result.losses), 0)  # type: ignore
+        return runner
+
+    def testMakeFromAntimony(self):
+        if IGNORE_TESTS:
+            return
+        for cls in [ModelRunnerNN, ModelRunnerPCA, ModelRunnerUMAP]:
+            _ = self.makeFromAntimony(cls)
+
+    def testPlotSimulationFit(self):
+        if IGNORE_TESTS:
+            return
+        runner = self.makeFromAntimony(ModelRunnerUMAP, num_epoch=10)
+        _ = runner.plotSimulationFit(is_plot=IS_PLOT, antimony_model="Sequential")
 
 if __name__ == '__main__':
     unittest.main()

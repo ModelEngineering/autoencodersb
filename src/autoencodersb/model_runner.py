@@ -1,17 +1,21 @@
 '''Abstract class for running a model. '''
 
 from autoencodersb import constants as cn
+import autoencodersb.utils as utils
+from autoencodersb.autoencoder import Autoencoder
+from autoencodersb.autoencoder_umap import AutoencoderUMAP
 
-from collections import namedtuple
-from copy import deepcopy
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd  # type: ignore
 from pandas.plotting import parallel_coordinates # type: ignore
+import tellurium as te  # type: ignore
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from typing import cast, Tuple, List, Optional, Union
+
+TIME = "time"
 
 
 """
@@ -24,10 +28,10 @@ Subclasses must implement the following methods:
 
 class RunnerResult(object):
     """Result of the model runner."""
-    def __init__(self, avg_loss: float, losses: Optional[list]=None,
+    def __init__(self, avg_loss: float, losses: List[float],
             mean_absolute_error: Optional[float]=None):
         self.avg_loss = avg_loss
-        self.losses = losses if losses is not None else []
+        self.losses = losses
         self.mean_absolute_error = mean_absolute_error
 
     def __len__(self):
@@ -37,18 +41,21 @@ class RunnerResult(object):
 
 class ModelRunner(object):
     # Runner for Autoencoder
+    model_cls: Union[type, None] = None  # The model class to use for this runner
 
-    def __init__(self, model:object, is_report:bool=False):
+    def __init__(self, model:object, is_report:bool=False, **kwargs):
         """
         Args:
             model (nn.Module): The model to train.
             criterion (nn.Module): Loss function to use for training.
             is_report (bool): Whether to print progress during training.    
+            kwargs: catch unneeded arguments
         """
         self.model = model
         self.criterion = nn.MSELoss(reduction='mean')
         self.is_report = is_report
-        self.train_dl: Union[None, DataLoader] = None
+        self.train_dl: Union[None, DataLoader] = None  # Training data
+        self.train_runner_result: Union[None, RunnerResult] = None  # Result from doing training
         # Calculated state
         self.feature_std_tnsr = torch.tensor([np.nan])  # Calculated by subclass
         self.target_std_tnsr = torch.tensor([np.nan])   # Calculated by subclass
@@ -223,3 +230,114 @@ class ModelRunner(object):
         new_tnsr[:, indices] = tensor[:, indices]*tensor[:, indices]
         denormalized_tensor = new_tnsr * self.feature_std_tnsr
         return denormalized_tensor
+    
+    def fitSimulation(self, simulation_df: Union[np.ndarray, pd.DataFrame], selections: Optional[List[str]]=None,
+            **fit_kwargs) -> RunnerResult:
+        """Fits a simulation model to the training data.
+            Assumes there is a time column.
+
+            Args:
+                simulation_df (Union[np.ndarray, pd.DataFrame]): Simulation data.
+                selections (Optional[str]): Columns to select for training.
+                fit_kwargs (dict): Additional arguments for fitting.
+
+        Returns:
+            RunnerResult
+        """
+        df = utils.namedarrayToDataframe(simulation_df)
+        if selections is None:
+            selections = list(df.columns)
+        else:
+            if not set(selections).issubset(df.columns.to_list()):
+                raise ValueError(f"Invalid selections: {selections}")
+        if TIME in df.columns:
+            del df[TIME]
+        self.train_dl = utils.dataframeToDataloader(df[selections])
+        self.train_runner_result = self.fit(self.train_dl, **fit_kwargs)
+        return self.train_runner_result
+    
+    def plotSimulationFit(self,
+            antimony_model:str="",
+            is_plot:bool=True) -> None:
+        if self.train_runner_result is None:
+            raise ValueError("Model has not been trained. Please call fitSimulation first.")
+        # Plot
+        data_df = self.train_dl.dataset.data_df  # type: ignore
+        variables = list(data_df.columns)
+        feature_tnsr = torch.Tensor(data_df.values)
+        prediction_tnsr = self.predict(feature_tnsr).to(cn.CPU)
+        prediction_arr = prediction_tnsr.detach().to(cn.CPU).numpy()
+        embedding_tnsr = cast(Autoencoder, self.model).encode(feature_tnsr).to(cn.CPU)
+        if is_plot:
+            # Plot the original time course
+            plt.plot(data_df.index, data_df.values)
+            plt.title(f"{antimony_model} - Original Data Space")
+            plt.xlabel("time")
+            if is_plot:
+                plt.show()
+            # Plot the reconstructed data
+            plt.plot(data_df.index, prediction_arr)
+            plt.legend(variables)
+            plt.title(f"{antimony_model} - Reconstructed Data Space")
+            plt.xlabel("time")
+            if is_plot:
+                plt.show()
+            # Accuracy scatter plot
+            _, ax = plt.subplots(1, 1)
+            for idx, name in enumerate(variables):
+                ax.scatter(data_df[name].values, prediction_arr[:, idx])
+            plt.title(f"{antimony_model} - Accuracy")
+            ax.set_xlabel("actual")
+            ax.set_ylabel("predicted")
+            ax.legend(variables)
+            if is_plot:
+                plt.show()
+            # Plot the embedding
+            plt.figure(figsize=(8, 6))
+            plt.scatter(embedding_tnsr[:, 0], embedding_tnsr[:, 1], alpha=0.5)
+            plt.title(f"{antimony_model} - Embedding Space")
+            plt.xlabel("UMAP 1")
+            plt.ylabel("UMAP 2")
+            if is_plot:
+                plt.show()
+
+    @classmethod
+    def makeFromAntimony(cls,
+            antimony_str: str,
+            reduced_dimension: int = 2,
+            start_time: int = 0,
+            end_time: int = 10,
+            num_point: int = 100,
+            selections: Optional[List[str]] = None,
+            **runner_kwargs) -> 'ModelRunner':
+        """Creates a ModelRunnerUMAP from an Antimony string and fits the model
+        Args:
+            antimony_str (str): Antimony string defining the model.
+            reduced_dimension (int): The reduced dimension for the UMAP model.
+            start_time (int): The start time for the simulation.
+            end_time (int): The end time for the simulation.
+            num_point (int): The number of points to simulate.
+            selections (Optional[List[str]]): Columns to select for training.
+            **runner_kwargs: Additional arguments for ModelRunnerUMAP.
+                num_epoch
+                learning_rate
+                is_normalized
+        Returns:
+            ModelRunnerUMAP
+        """
+        rr = te.loada(antimony_str)
+        data_arr = rr.simulate(start_time, end_time, num_point)
+        if selections is not None:
+            num_input_feature = len(selections)
+        else:
+            num_input_feature = data_arr.shape[1] - 1
+        layer_dimensions = [num_input_feature, 10*num_input_feature, 10*reduced_dimension, reduced_dimension]
+        if cls.model_cls is None:
+            kwargs = dict(runner_kwargs)
+            kwargs['n_components'] = reduced_dimension
+            runner = cls(**kwargs)
+        else:
+            model = cast(type, cls.model_cls)(layer_dimensions=layer_dimensions)
+            runner = cls(model=model, **runner_kwargs)
+        _ = runner.fitSimulation(data_arr, selections=selections)
+        return runner

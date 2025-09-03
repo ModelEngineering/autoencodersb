@@ -8,12 +8,13 @@ import autoencodersb.utils as utils  # type: ignore
 from copy import deepcopy
 import numpy as np
 from pandas.plotting import parallel_coordinates # type: ignore
+import tellurium as te  # type: ignore
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm  # type: ignore
-from typing import cast, Optional
+from typing import cast, Optional, List
 
 
 ACCURACY_WEIGHT = 1  # Weight in loss function for accuracy
@@ -26,6 +27,7 @@ ACCURACY_WEIGHT = 1  # Weight in loss function for accuracy
 
 class ModelRunnerUMAP(ModelRunnerNN):
     # Runner for Autoencoder
+    model_cls = AutoencoderUMAP
 
     def __init__(self, model: AutoencoderUMAP, **kwargs):
         super().__init__(model, **kwargs)
@@ -59,19 +61,18 @@ class ModelRunnerUMAP(ModelRunnerNN):
         full_feature_tnsr = self.model.encode(data_tnsr.to(cn.DEVICE))  # type: ignore
         full_target_tnsr = data_tnsr.to(cn.DEVICE)
         num_sample = full_feature_tnsr.size(0)
-        num_dimension = full_feature_tnsr.size(1)
         # Initialize for training
         losses = []
-        loss_std = 1e10
+        rmse = 1e10
         epoch_loss = np.inf
         batch_size = train_dl.batch_size
         # Training loop
-        pbar = tqdm(range(self.last_epoch, self.num_epoch), desc=f"loss (std)={loss_std:.4f})")
+        pbar = tqdm(range(self.last_epoch, self.num_epoch), desc=f"rmse={rmse:.4f}")
         for epoch in pbar:
             permutation = torch.randperm(num_sample)
             batch_size = cast(int, batch_size)
             num_batch = num_sample // batch_size
-            pbar.set_description_str(f"epochs (loss (std)={loss_std:.4f})")
+            pbar.set_description_str(f"epochs (rmse={rmse:.4f})")
             epoch_loss = 0
             total_mse = 0
             for iter in range(num_batch):
@@ -94,13 +95,13 @@ class ModelRunnerUMAP(ModelRunnerNN):
                 epoch_loss += loss.item()
                 total_mse += prediction_tnsr.size(0)*reconstruction_loss.item()
             # loss_std is in units of standard deviation
-            loss_std = np.sqrt(total_mse / num_sample)
-            losses.append(loss_std)
+            rmse = np.sqrt(total_mse / num_sample)
+            losses.append(rmse)
             if self.is_report:
-                print(f'Epoch [{epoch+1}/{self.num_epoch}], Loss: {loss_std:.4f}')
+                print(f'Epoch [{epoch+1}/{self.num_epoch}], Loss: {rmse:.4f}')
         self.last_epoch = self.num_epoch
         #
-        return RunnerResultNN(avg_loss=loss_std, losses=losses, num_epochs=self.num_epoch)
+        return RunnerResultNN(avg_loss=rmse, losses=losses, num_epochs=self.num_epoch)
 
     def predict(self, feature_tnsr: torch.Tensor) -> torch.Tensor:
         """Predicts the target for the features.

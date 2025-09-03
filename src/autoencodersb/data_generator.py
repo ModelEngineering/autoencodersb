@@ -1,9 +1,7 @@
 '''Generates synthetic data for training and testing autoencoders.'''
 
 from autoencodersb import constants as cn  # type: ignore
-from autoencodersb.dataset_csv import DatasetCSV
 from autoencodersb.polynomial_collection import PolynomialCollection  # type: ignore
-from autoencodersb.dataset_csv import DatasetCSV # type: ignore
 from autoencodersb.sequence import Sequence# type: ignore
 import autoencodersb.utils as utils  # type: ignore
 
@@ -51,8 +49,7 @@ class DataGenerator(object):
         self.variable_func: Callable[[int], pd.DataFrame] = lambda x: pd.DataFrame(np.array([]))
         # Updated during fit
         self.data_df = pd.DataFrame()
-        self.data_dl = DataLoader(DatasetCSV(csv_input=self.data_df, target_column=None),
-                shuffle=self.is_shuffle, batch_size=10)
+        self.data_dl = utils.dataframeToDataloader(self.data_df, shuffle=self.is_shuffle, batch_size=10)
 
     def generate(self) -> DataLoader:
         """Generates the full synthetic dataset."""
@@ -66,7 +63,7 @@ class DataGenerator(object):
         self.data_df = pd.concat([independent_df, dependent_df], axis=1)
         # Construct the DataLoader
         batch_size = int(np.ceil(BATCH_SIZE_FRACTION*self.num_sample))
-        self.data_dl = DataLoader(DatasetCSV(csv_input=self.data_df, target_column=None),
+        self.data_dl = utils.dataframeToDataloader(self.data_df,
                 shuffle=self.is_shuffle, batch_size=batch_size)
         return self.data_dl
 

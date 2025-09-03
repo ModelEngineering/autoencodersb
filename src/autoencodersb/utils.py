@@ -1,8 +1,12 @@
+from autoencodersb.dataset_csv import DatasetCSV
 import autoencodersb.constants as cn
-from torch.utils.data import DataLoader
 
 import numpy as np
 import pandas as pd  # type: ignore
+import torch
+from torch.utils.data import DataLoader
+from torch.utils.data import TensorDataset
+from typing import Union, Optional
 
 def dataloaderToDataframe(dataloader: DataLoader) -> pd.DataFrame:
     """Converts a DataLoader to a pandas DataFrame.
@@ -15,6 +19,51 @@ def dataloaderToDataframe(dataloader: DataLoader) -> pd.DataFrame:
     """
     return dataloader.dataset.data_df.copy()  # type: ignore
 
+def dataframeToDataloader(df: pd.DataFrame, target_column: Optional[str]=None, **dl_kwargs) -> DataLoader:
+    """Converts a pandas DataFrame to a DataLoader.
+
+    Args:
+        df (pd.DataFrame): The DataFrame to convert.
+        target_column (Optional[str]): The name of the target column, if any.
+       **dl_kwargs: Additional arguments to pass to the DataLoader.
+                    (shuffle: bool, batch_size: int)
+
+    Returns:
+        DataLoader: The resulting DataLoader.
+    """
+    dataset = DatasetCSV(csv_input=df, target_column=target_column)
+    return DataLoader(dataset, **dl_kwargs)
+
+def namedarrayToDataframe(named_arr: Union[pd.DataFrame, np.ndarray],
+        is_time_index: bool=True, is_remove_brackes: bool=True) -> pd.DataFrame:
+    """Converts a named array to a pandas DataFrame.
+
+    Args:
+        named_arr (Union[pd.DataFrame, np.ndarray]): The named array to convert.
+        is_time_index (bool): Make time the index
+        is_remove_brackes (bool): Whether to remove brackets from the DataFrame.
+
+    Returns:
+        pd.DataFrame: The resulting DataFrame.
+    """
+    if isinstance(named_arr, pd.DataFrame):
+        dataframe = named_arr.copy()
+        columns = dataframe.columns.tolist()
+    elif isinstance(named_arr, np.ndarray):
+        if hasattr(named_arr, 'colnames'):
+            columns = named_arr.colnames  # type: ignore
+        else:
+            columns = [f"feature_{i}" for i in range(named_arr.shape[1])]
+        dataframe = pd.DataFrame(named_arr, columns=columns)
+    #
+    if is_time_index and cn.TIME in columns:
+        dataframe.set_index(cn.TIME, inplace=True)
+        columns = dataframe.columns.tolist()
+    if is_remove_brackes:
+        columns = [col.replace("[", "").replace("]", "") for col in columns]
+        dataframe.columns = columns
+    #
+    return dataframe
 
 def calculateMaximumRelativeError(reference_arr: np.ndarray, target_arr: np.ndarray) -> np.ndarray:
     """Calculate the maximum relative error between this data generator and a DataFrame.

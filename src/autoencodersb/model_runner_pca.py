@@ -14,6 +14,7 @@ warnings.filterwarnings('ignore')
 
 
 class ModelRunnerPCA(ModelRunner):
+    model_cls = None  # No model is constructed in advance
     """
     Calculates predicted value using PCA.
     """
@@ -23,6 +24,7 @@ class ModelRunnerPCA(ModelRunner):
         Args:
             random_state (int, optional): Random state for reproducibility. Defaults to 42.
             n_components (int, optional): Number of PCA components. Defaults to 2.
+            kwargs: catch unneeded arguments
         """
         super().__init__(self, **kwargs)
         self.n_components = n_components
@@ -30,7 +32,7 @@ class ModelRunnerPCA(ModelRunner):
         self.scaler = StandardScaler()
         self.pca = PCA(n_components=self.n_components, random_state=self.random_state)
     
-    def fit(self, train_dl: DataLoader) -> RunnerResult:
+    def fit(self, train_dl: DataLoader, **kwargs) -> RunnerResult:
         """
         Fit PCA and transform the data
         
@@ -38,6 +40,7 @@ class ModelRunnerPCA(ModelRunner):
         -----------
         train_loader : DataLoader
             DataLoader for the training data
+            kwargs: catch unneeded arguments
 
         Returns:
         --------
@@ -54,7 +57,8 @@ class ModelRunnerPCA(ModelRunner):
         avg_loss = self.criterion(prediction_tnsr, target_tnsr)
         mean_absolute_error = torch.mean(torch.abs(prediction_tnsr - target_tnsr)).numpy().item()
         #
-        return RunnerResult(avg_loss=avg_loss, mean_absolute_error=mean_absolute_error)
+        return RunnerResult(avg_loss=avg_loss, mean_absolute_error=mean_absolute_error,
+            losses=[avg_loss])
 
     def _encode(self, x_test:torch.Tensor) -> torch.Tensor:
         """

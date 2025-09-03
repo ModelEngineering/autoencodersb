@@ -44,7 +44,7 @@ class AutoencoderUMAP(Autoencoder):
 
     def forward(self, x:torch.Tensor) -> torch.Tensor:
         # Encode
-        encoded = self.encoder(x)
+        encoded = self.encode(x)
         # Decode
         decoded = self.decoder(encoded)
         return decoded
