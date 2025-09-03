@@ -76,7 +76,7 @@ class TestModelRunner(unittest.TestCase):
         D = 0
         E = 0
         """
-        runner = cls.makeFromAntimony(ant_str, selections=["B", "C", "D"], num_epoch=num_epoch)
+        runner = cls.makeFromSBML(ant_str, selections=["B", "C", "D"], num_epoch=num_epoch)
         self.assertIsInstance(runner, cls)
         self.assertGreater(len(runner.train_runner_result.losses), 0)  # type: ignore
         return runner
@@ -91,6 +91,10 @@ class TestModelRunner(unittest.TestCase):
         if IGNORE_TESTS:
             return
         runner = self.makeFromAntimony(ModelRunnerUMAP, num_epoch=10)
+        _ = runner.plotSimulationFit(is_plot=IS_PLOT, antimony_model="Sequential")
+        #
+        url = "https://www.ebi.ac.uk/biomodels/services/download/get-files/MODEL2004140001/3/Garde2020.xml"
+        runner = ModelRunnerUMAP.makeFromSBML(url, selections=['Gp', 'Gi', 'A'], num_epoch=10)
         _ = runner.plotSimulationFit(is_plot=IS_PLOT, antimony_model="Sequential")
 
 if __name__ == '__main__':

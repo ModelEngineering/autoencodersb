@@ -302,8 +302,8 @@ class ModelRunner(object):
                 plt.show()
 
     @classmethod
-    def makeFromAntimony(cls,
-            antimony_str: str,
+    def makeFromSBML(cls,
+            model_str: str,
             reduced_dimension: int = 2,
             start_time: int = 0,
             end_time: int = 10,
@@ -312,7 +312,7 @@ class ModelRunner(object):
             **runner_kwargs) -> 'ModelRunner':
         """Creates a ModelRunnerUMAP from an Antimony string and fits the model
         Args:
-            antimony_str (str): Antimony string defining the model.
+            model_str (str): Antimony or url string defining the model.
             reduced_dimension (int): The reduced dimension for the UMAP model.
             start_time (int): The start time for the simulation.
             end_time (int): The end time for the simulation.
@@ -325,7 +325,10 @@ class ModelRunner(object):
         Returns:
             ModelRunnerUMAP
         """
-        rr = te.loada(antimony_str)
+        if "http" in model_str:
+            rr = te.loadSBMLModel(model_str)
+        else:
+            rr = te.loada(model_str)
         data_arr = rr.simulate(start_time, end_time, num_point)
         if selections is not None:
             num_input_feature = len(selections)
