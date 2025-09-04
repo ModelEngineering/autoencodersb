@@ -6,12 +6,13 @@ from autoencodersb.data_generator import DataGenerator # type: ignore
 from autoencodersb.sequence import Sequence # type: ignore
 import autoencodersb.constants as cn  # type: ignore
 
+import os
 import torch
 import unittest
 
 IGNORE_TESTS = False
 IS_PLOT = False
-NUM_EPOCH = 100
+NUM_EPOCH = 10
 NUM_SAMPLE = 1000
 
 POLYNOMIAL_COLLECTION = PolynomialCollection.make(
@@ -37,6 +38,7 @@ GENERATOR.generate()
 TEST_DL = GENERATOR.data_dl
 MODEL = AutoencoderUMAP(layer_dimensions=[NUM_INPUT_FEATURE, 10*NUM_INPUT_FEATURE,
         10*NUM_OUTPUT_FEATURE, NUM_OUTPUT_FEATURE])
+RECOVERY_PATH = os.path.join(cn.TEST_DIR, "test_model_runner_umap.pkl")
 
 def makeModel():
     """Creates a model for testing."""
@@ -90,6 +92,14 @@ class TestModelRunnerUMAP(unittest.TestCase):
             return
         self.assertTrue(self.runner.isSameModel(self.runner.model))
         self.assertFalse(self.runner.isSameModel(makeModel()))
+
+    def testRecovery(self):
+        if IGNORE_TESTS:
+            return
+        _ = self.runner.fit(TRAIN_DL, num_epoch=20, is_keep_recovery_file=True, recovery_path=RECOVERY_PATH)
+        runner = self.runner.deserialize(RECOVERY_PATH)
+        self.assertEqual(str(self.runner.__class__), str(runner.__class__))
+        self.runner.plotEvaluate(TEST_DL, is_plot=IS_PLOT)
 
 if __name__ == '__main__':
     unittest.main()

@@ -41,6 +41,7 @@ class RunnerResult(object):
 
 class ModelRunner(object):
     # Runner for Autoencoder
+    RECOVERY_INTERVAL = 100  # Save state every 100 epochs
     model_cls: Union[type, None] = None  # The model class to use for this runner
 
     def __init__(self, model:object, is_report:bool=False, **kwargs):
@@ -59,6 +60,9 @@ class ModelRunner(object):
         # Calculated state
         self.feature_std_tnsr = torch.tensor([np.nan])  # Calculated by subclass
         self.target_std_tnsr = torch.tensor([np.nan])   # Calculated by subclass
+
+    def makeRecoveryPath(self):
+        return f"{str(self.__class__.__name__)}_{np.random.randint(0, 10000)}.pkl"
 
     @staticmethod
     def getFeatureTarget(loader: DataLoader) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -257,53 +261,83 @@ class ModelRunner(object):
         return self.train_runner_result
     
     def plotSimulationFit(self,
-            antimony_model:str="",
+            model_ref:str,
+            is_plot_original: bool = False,
+            is_plot_reconstructed: bool = True,
+            is_plot_accuracy: bool = True,
+            is_plot_embedding: bool = True,
             is_plot:bool=True) -> None:
+        """Plots the simulation fit results.
+
+        Args:
+            model_ref (str): Model reference (Antimony str or URL)
+            is_plot_original (bool, optional): Whether to plot the original data. Defaults to False.
+            is_plot_reconstructed (bool, optional): Whether to plot the reconstructed data. Defaults to True.
+            is_plot_accuracy (bool, optional): Whether to plot the accuracy. Defaults to True.
+            is_plot_embedding (bool, optional): Whether to plot the embedding. Defaults to True.
+            is_plot (bool, optional): Whether to show the plot. Defaults to True.
+
+        Raises:
+            ValueError: _description_
+        """
         if self.train_runner_result is None:
             raise ValueError("Model has not been trained. Please call fitSimulation first.")
-        # Plot
+        # Setup
         data_df = self.train_dl.dataset.data_df  # type: ignore
         variables = list(data_df.columns)
+        if isinstance(self.model, nn.Module):
+            self.model.eval()
+            self.model = self.model.to(cn.CPU)
         feature_tnsr = torch.Tensor(data_df.values)
-        prediction_tnsr = self.predict(feature_tnsr).to(cn.CPU)
+        prediction_tnsr = self.predict(feature_tnsr)
         prediction_arr = prediction_tnsr.detach().to(cn.CPU).numpy()
-        embedding_tnsr = cast(Autoencoder, self.model).encode(feature_tnsr).to(cn.CPU)
+        if hasattr(self.model, 'to'):
+            model = cast(Autoencoder, self.model).to(cn.CPU)
+        else:
+            model = self.model
+        embedding_tnsr = model.encode(feature_tnsr)
+        if isinstance(self.model, nn.Module):
+            embedding_tnsr = embedding_tnsr.to(cn.CPU)
+            feature_tnsr = feature_tnsr.to(cn.CPU)
+        # Plot
         if is_plot:
-            # Plot the original time course
-            plt.plot(data_df.index, data_df.values)
-            plt.title(f"{antimony_model} - Original Data Space")
-            plt.xlabel("time")
-            if is_plot:
+            if is_plot_original:
+                # Plot the original time course
+                plt.plot(data_df.index, data_df.values)
+                plt.title(f"{model_ref} - Original Data Space")
+                plt.xlabel("time")
+                plt.legend(variables)
                 plt.show()
-            # Plot the reconstructed data
-            plt.plot(data_df.index, prediction_arr)
-            plt.legend(variables)
-            plt.title(f"{antimony_model} - Reconstructed Data Space")
-            plt.xlabel("time")
-            if is_plot:
+            if is_plot_reconstructed:
+                # Plot the reconstructed data
+                plt.plot(data_df.index, prediction_arr)
+                plt.legend(variables)
+                plt.title(f"{model_ref} - Reconstructed Data Space")
+                plt.xlabel("time")
                 plt.show()
-            # Accuracy scatter plot
-            _, ax = plt.subplots(1, 1)
-            for idx, name in enumerate(variables):
-                ax.scatter(data_df[name].values, prediction_arr[:, idx])
-            plt.title(f"{antimony_model} - Accuracy")
-            ax.set_xlabel("actual")
-            ax.set_ylabel("predicted")
-            ax.legend(variables)
-            if is_plot:
+            if is_plot_accuracy:
+                # Accuracy scatter plot
+                _, ax = plt.subplots(1, 1)
+                for idx, name in enumerate(variables):
+                    ax.scatter(data_df[name].values, prediction_arr[:, idx])
+                plt.title(f"{model_ref} - Accuracy")
+                ax.set_xlabel("actual")
+                ax.set_ylabel("predicted")
+                ax.legend(variables)
                 plt.show()
-            # Plot the embedding
-            plt.figure(figsize=(8, 6))
-            plt.scatter(embedding_tnsr[:, 0], embedding_tnsr[:, 1], alpha=0.5)
-            plt.title(f"{antimony_model} - Embedding Space")
-            plt.xlabel("UMAP 1")
-            plt.ylabel("UMAP 2")
-            if is_plot:
+            if is_plot_embedding:
+                # Plot the embedding
+                plt.figure(figsize=(8, 6))
+                plt.scatter(embedding_tnsr.detach().cpu().numpy()[:, 0],
+                        embedding_tnsr.detach().cpu().numpy()[:, 1], alpha=0.5)
+                plt.title(f"{model_ref} - Embedding Space")
+                plt.xlabel("UMAP 1")
+                plt.ylabel("UMAP 2")
                 plt.show()
 
     @classmethod
     def makeFromSBML(cls,
-            model_str: str,
+            model_ref: Union[str, int],
             reduced_dimension: int = 2,
             start_time: int = 0,
             end_time: int = 10,
@@ -312,7 +346,7 @@ class ModelRunner(object):
             **runner_kwargs) -> 'ModelRunner':
         """Creates a ModelRunnerUMAP from an Antimony string and fits the model
         Args:
-            model_str (str): Antimony or url string defining the model.
+            model_ref (Union[str, int]): Antimony or url or model number for the model.
             reduced_dimension (int): The reduced dimension for the UMAP model.
             start_time (int): The start time for the simulation.
             end_time (int): The end time for the simulation.
@@ -325,10 +359,13 @@ class ModelRunner(object):
         Returns:
             ModelRunnerUMAP
         """
-        if "http" in model_str:
-            rr = te.loadSBMLModel(model_str)
+        if "http" in cast(str, model_ref):
+            rr = te.loadSBMLModel(model_ref)
+        elif isinstance(model_ref, int):
+            sbml_str = utils.getLocalURL(model_num=model_ref)
+            rr = te.loadSBMLModel(sbml_str)
         else:
-            rr = te.loada(model_str)
+            rr = te.loada(model_ref)
         data_arr = rr.simulate(start_time, end_time, num_point)
         if selections is not None:
             num_input_feature = len(selections)

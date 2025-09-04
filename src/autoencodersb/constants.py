@@ -1,5 +1,6 @@
 from collections import namedtuple
 import numpy as np
+import os
 import torch
 
 # Set device
@@ -43,6 +44,15 @@ SEQ_EXPONENTIAL = "exponential"
 SEQ_INTEGRAL_EXPONENTIAL = "integral_exponential"
 SEQ_TYPES = [SEQ_LINEAR, SEQ_EXPONENTIAL, SEQ_INTEGRAL_EXPONENTIAL]
 
+# Directories
+PROJECT_DIR = os.path.abspath(os.path.dirname(__file__))
+for _ in range(2):
+    PROJECT_DIR = os.path.dirname(PROJECT_DIR)
+TEST_DIR = os.path.join(PROJECT_DIR, "tests")
+DATA_DIR = os.path.join(PROJECT_DIR, "data")
+CODE_DIR = os.path.join(PROJECT_DIR, "src", "autoencodersb")
+LOCAL_MODEL_DIR = "/Users/jlheller/home/Technical/repos/SBMLModel/data"
 
 ######## CLASSES ########
 CDF = namedtuple('CDF', ['variate_arr', 'cdf_arr', 'variate_min', 'variate_max'])
+

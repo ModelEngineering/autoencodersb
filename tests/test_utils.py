@@ -33,5 +33,22 @@ class TestFunction(unittest.TestCase):
         expected = np.array([0.5, -0.5])
         self.assertTrue(np.allclose(max_rel_error_arr, expected, atol=1e-3))
 
+    def testGetLocalURL(self):
+        if IGNORE_TESTS:
+            return
+        local_file_contents = utils.getLocalURL(model_num=895)
+        self.assertIsInstance(local_file_contents, str)
+        #
+        url = "https://www.ebi.ac.uk/biomodels/services/download/get-files/MODEL3352181362/3/BIOMD0000000206_url.xml"
+        local_file_contents = utils.getLocalURL(url=url)
+        if local_file_contents is None:
+            print("Got None!")
+        else:
+            self.assertIsInstance(local_file_contents, str)
+        #
+        url = "https://www.ebi.ac.uk/biomodels/services/download/get-files/MODEL3352181362/3/BIOMD000000020A_url.xml"
+        local_file_contents = utils.getLocalURL(url=url)
+        self.assertIsNone(local_file_contents, str)
+
 if __name__ == '__main__':
     unittest.main()

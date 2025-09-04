@@ -7,6 +7,7 @@ import autoencodersb.utils as utils  # type: ignore
 
 from copy import deepcopy
 import numpy as np
+import os
 from pandas.plotting import parallel_coordinates # type: ignore
 import tellurium as te  # type: ignore
 import torch
@@ -32,7 +33,9 @@ class ModelRunnerUMAP(ModelRunnerNN):
     def __init__(self, model: AutoencoderUMAP, **kwargs):
         super().__init__(model, **kwargs)
 
-    def fit(self, train_dl: Optional[DataLoader]=None, num_epoch: Optional[int]=None) -> RunnerResultNN:
+    # FIXME: Make sure that number of epochs is current for save
+    def fit(self, train_dl: Optional[DataLoader]=None, num_epoch: Optional[int]=None,
+            recovery_path:Optional[str]=None, is_keep_recovery_file: bool=False) -> RunnerResultNN:
         """
         Train the model. All calculations are on the accelerator device.
         The UMAP embeddings are the feature. Then the decoder is trained on the UMAP embedding.
@@ -41,10 +44,14 @@ class ModelRunnerUMAP(ModelRunnerNN):
         Args:
             train_loader (DataLoader): DataLoader for training data. Preserved for subsequent iterations.
             num_epoch (Optional[int]): Number of epochs to (incrementally) train. If None, uses the initial value.
+            recovery_path (Optional[str]): Path to save model checkpoints.
+            is_keep_recovery_file (bool): Whether to keep the recovery file after training.
         Returns:
             RunnerResult: losses and number of epochs
         """
         cast(nn.Module, self.model).train()
+        if recovery_path is None:
+            recovery_path = self.makeRecoveryPath()
         #
         self.num_epoch = num_epoch if num_epoch is not None else self.num_epoch
         if train_dl is None:
@@ -99,8 +106,14 @@ class ModelRunnerUMAP(ModelRunnerNN):
             losses.append(rmse)
             if self.is_report:
                 print(f'Epoch [{epoch+1}/{self.num_epoch}], Loss: {rmse:.4f}')
+            # Update recovery path
+            if epoch % self.RECOVERY_INTERVAL == 0:
+                self.serialize(recovery_path)
         self.last_epoch = self.num_epoch
-        #
+        # Delete the recovery file and return
+        if os.path.exists(recovery_path):
+            if not is_keep_recovery_file:
+                os.remove(recovery_path)
         return RunnerResultNN(avg_loss=rmse, losses=losses, num_epochs=self.num_epoch)
 
     def predict(self, feature_tnsr: torch.Tensor) -> torch.Tensor:

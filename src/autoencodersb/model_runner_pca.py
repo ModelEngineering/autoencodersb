@@ -60,7 +60,7 @@ class ModelRunnerPCA(ModelRunner):
         return RunnerResult(avg_loss=avg_loss, mean_absolute_error=mean_absolute_error,
             losses=[avg_loss])
 
-    def _encode(self, x_test:torch.Tensor) -> torch.Tensor:
+    def encode(self, x_test:torch.Tensor) -> torch.Tensor:
         """
         Encode data using PCA
         
@@ -76,7 +76,7 @@ class ModelRunnerPCA(ModelRunner):
         """
         return torch.Tensor(self.pca.transform(self.scaler.transform(x_test.numpy()))) # type: ignore
 
-    def _decode(self, x_reduced:torch.Tensor) -> torch.Tensor:
+    def decode(self, x_reduced:torch.Tensor) -> torch.Tensor:
         """
         Decode data back to original space
         
@@ -106,7 +106,7 @@ class ModelRunnerPCA(ModelRunner):
         X_predicted : array-like, shape (n_samples, n_components)
             Predicted data
         """
-        return self._decode(self._encode(feature_tnsr))
+        return self.decode(self.encode(feature_tnsr))
     
     def serialize(self, path:str):
         """Serializes the PCA model to a file."""

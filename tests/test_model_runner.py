@@ -90,12 +90,22 @@ class TestModelRunner(unittest.TestCase):
     def testPlotSimulationFit(self):
         if IGNORE_TESTS:
             return
+        url = "https://www.ebi.ac.uk/biomodels/services/download/get-files/MODEL2004140001/3/Garde2020.xml"
+        runner = ModelRunnerPCA.makeFromSBML(url, selections=['Gp', 'Gi', 'A'], num_epoch=10)
+        _ = runner.plotSimulationFit(is_plot=IS_PLOT, model_ref="Sequential",
+                is_plot_original=True, is_plot_reconstructed=True,
+                is_plot_accuracy=True, is_plot_embedding=True)
+        #
         runner = self.makeFromAntimony(ModelRunnerUMAP, num_epoch=10)
-        _ = runner.plotSimulationFit(is_plot=IS_PLOT, antimony_model="Sequential")
+        _ = runner.plotSimulationFit(is_plot=IS_PLOT, model_ref="Sequential",
+                is_plot_original=False, is_plot_reconstructed=True,
+                is_plot_accuracy=True, is_plot_embedding=False)
         #
         url = "https://www.ebi.ac.uk/biomodels/services/download/get-files/MODEL2004140001/3/Garde2020.xml"
         runner = ModelRunnerUMAP.makeFromSBML(url, selections=['Gp', 'Gi', 'A'], num_epoch=10)
-        _ = runner.plotSimulationFit(is_plot=IS_PLOT, antimony_model="Sequential")
+        _ = runner.plotSimulationFit(is_plot=IS_PLOT, model_ref="Sequential",
+                is_plot_original=False, is_plot_reconstructed=True,
+                is_plot_accuracy=True, is_plot_embedding=False)
 
 if __name__ == '__main__':
     unittest.main()

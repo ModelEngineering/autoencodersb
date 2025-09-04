@@ -2,8 +2,8 @@ from autoencodersb.dataset_csv import DatasetCSV
 import autoencodersb.constants as cn
 
 import numpy as np
+import os
 import pandas as pd  # type: ignore
-import torch
 from torch.utils.data import DataLoader
 from torch.utils.data import TensorDataset
 from typing import Union, Optional
@@ -89,3 +89,29 @@ def calculateMaximumRelativeError(reference_arr: np.ndarray, target_arr: np.ndar
     value_arr[is_max_arr] = max_arr[is_max_arr]
     #
     return value_arr
+
+def getLocalURL(url: Optional[str]=None, model_num: Optional[int]=None) -> Union[str, None]:
+    """Finds the local file for a URL and returns the file contents.
+
+    Args:
+        url (str): The URL to convert.
+            "https://www.ebi.ac.uk/biomodels/services/download/get-files/MODEL3352181362/3/BIOMD0000000206_url.xml"
+
+    Returns:
+        str: File contents
+    """
+    if url is not None:
+        start_pos = url.index("BIOMD")
+        if start_pos < 0:
+            raise ValueError("URL does not contain 'BIOMD'")
+        end_pos = url.index("_url")
+        local_path = os.path.join(cn.LOCAL_MODEL_DIR, f"BIOMD0{url[start_pos + 6:end_pos]}.xml")
+    elif model_num is not None:
+        local_path = os.path.join(cn.LOCAL_MODEL_DIR, f"BIOMD{model_num:010d}.xml")
+    else:
+        raise ValueError("Either url or model_num must be provided.")
+    if not os.path.exists(local_path):
+        return None
+    # Read the file contents
+    with open(local_path, "r") as f:
+        return f.read()
