@@ -2,7 +2,6 @@ from autoencodersb.model_runner import ModelRunner, RunnerResult # type: ignore
 
 import joblib # type: ignore
 import numpy as np
-import os
 import seaborn as sns # type: ignore
 from sklearn.decomposition import PCA # type:ignore
 from sklearn.preprocessing import StandardScaler # type:ignore

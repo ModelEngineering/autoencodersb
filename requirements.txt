@@ -1,4 +1,5 @@
 jupyterlab
+keras
 matplotlib
 mypy
 numpy

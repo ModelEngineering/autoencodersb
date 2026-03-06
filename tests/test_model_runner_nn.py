@@ -13,8 +13,8 @@ from torch.utils.data import DataLoader
 import pandas as pd    # type: ignore
 import unittest
 
-IGNORE_TESTS = True
-IS_PLOT = True
+IGNORE_TESTS = False
+IS_PLOT = False
 NUM_EPOCH = 2000
 NUM_EPOCH = 1000
 TARGET_COLUMN = "target"  # Assuming the target column is named 'target'
@@ -88,12 +88,6 @@ class TestModelRunner(unittest.TestCase):
             return
         self.assertTrue(self.runner.isSameModel(self.runner.model))
         self.assertFalse(self.runner.isSameModel(makeModel()))
-
-    def testBug1(self):
-        #if IGNORE_TESTS:
-        #    return
-        runner = ModelRunnerNN.makeFromSBML(utils.getLocalURL(model_num=895), num_epoch=5)
-        _ = runner.plotSimulationFit(model_ref="Schokker/Autoencoder")
 
 if __name__ == '__main__':
     unittest.main()
